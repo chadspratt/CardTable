@@ -1,0 +1,57 @@
+body {
+    overflow: hidden;
+}
+#playArea {
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    border: 1px solid #d3d3d3;
+    /*width: 99%;*/
+    /*height: 99%;*/
+    /*on bottom*/
+    z-index: 0;
+}
+.hiddenFeatureGroup {
+    display: none;
+}
+#viewControls {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    max-width: 100px;
+}
+#coordDisplay {
+    position: absolute;
+    left: 10px;
+    bottom: 10px;
+    max-width: 200px;
+}
+#gameControls {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+}
+#loadDeckHeader {
+    text-align: right;
+}
+#mouseoverBox {
+    position: absolute;
+    /*off screen initially*/
+    top: -1000px;
+    left: -1000px;
+/*    width: 200px;
+    height: 20px;*/
+    /*on top of everything else*/
+    z-index: 3;
+}
+.links {
+    cursor: pointer;
+    text-decoration: underline;
+}
+.overlayItem {
+    background-color: #ffffff;
+    border: 1px solid #d3d3d3;
+}
+.inline {
+    display: inline-block;
+}
