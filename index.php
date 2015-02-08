@@ -18,7 +18,6 @@
 <body>
 
 <svg id="playAreaSVG">
-  <g id="counters"></g>
   <g id="cards">
       <g id="library"></g>
       <g id="hand"></g>
@@ -26,6 +25,8 @@
       <g id="graveyard"></g>
       <g id="exile"></g>
   </g>
+  <g id="counters"></g>
+  <g id="enlargedCard"></g>
   <g id="skeuomorphicTable"></g>
 </svg>
 

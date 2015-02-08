@@ -51,8 +51,9 @@ function TableData() {
         }
     }
     this.drawCard = function () {
-        var newCard = this.library.pop();
-        this.hand.push(newCard);
+        if (this.library.length > 0) {
+            this.hand.push(this.library.pop());
+        }
     }
     this.playCard = function (cardId) {
         for (var i = 0; i < this.hand.length; i++) {
@@ -91,10 +92,30 @@ function PlayAreaSVG() {
     this.drag = d3.behavior.drag();
     this.drag.on('dragstart', function() {
         d3.event.sourceEvent.stopPropagation(); // silence other listeners
+        // if it is an enlarged card, make it transparent so you can see where
+        // you're dragging the actual-size card
+        var img = d3.select(this);
+        if (img.classed('enlarged')) {
+            img.attr('opacity', '0.0');
+        }
     });
     this.drag.on('drag', function (d) {
+        var img = d3.select(this);
+        if (img.classed('enlarged')) {
+            // move the enlarged card
+            d.enlargedX += d3.event.dx;
+            d.enlargedY += d3.event.dy;
+
+            img
+                .attr('x', d.enlargedX)
+                .attr('y', d.enlargedY);
+
+            // move source card beneath it too
+            img = d.originCard;
+        }
+
         // put the card on top of other cards in its group
-        var parent = d3.select($(this).parent()[0]);
+        var parent = d3.select($(img).parent()[0]);
         parent.selectAll('image')
             .sort(function(a, b) {
                 if(a.ID === d.ID)   {
@@ -106,10 +127,16 @@ function PlayAreaSVG() {
         // move the card
         d.x += d3.event.dx;
         d.y += d3.event.dy;
-        d3.select(this)
+        img
             .attr('x', d.x)
             .attr('y', d.y);
     });
+    this.drag.on('dragend', function () {
+        var img = d3.select(this);
+        if (img.classed('enlarged')) {
+            img.attr('opacity', '1.0');
+        }
+    })
 
     this.resizeSVG = function () {
         // http://stackoverflow.com/a/16265661/225730
@@ -135,40 +162,6 @@ function PlayAreaSVG() {
                        self.viewBox.width + ' ' +
                        self.viewBox.height;
             });
-        }
-    };
-    // resize feature icons so they stay the same size on the screen
-    this.scaleFeatures = function () {
-        var featureSize,
-            featureWidth,
-            featureHeight;
-        if (self.scale !== 0) {
-            featureSize = self.featureIconSize / self.scale;
-            d3.selectAll('#featureGroup image')
-                .attr('width', function (d) {
-                    if (d.feature.boundary.width > d.feature.boundary.height) {
-                        featureWidth = featureSize;
-                    }
-                    else {
-                        featureWidth = featureSize * d.feature.boundary.width / d.feature.boundary.height;
-                    }
-                    return featureWidth;
-                })
-                .attr('height', function (d) {
-                    if (d.feature.boundary.width > d.feature.boundary.height) {
-                        featureHeight = featureSize;
-                    }
-                    else {
-                        featureHeight = featureSize * d.feature.boundary.height / d.feature.boundary.width;
-                    }
-                    return featureHeight;
-                })
-                .attr('x', function (d) {
-                    return d.feature.boundary.centerX - featureWidth / 2;
-                })
-                .attr('y', function (d) {
-                    return d.feature.boundary.centerY - featureHeight / 2;
-                });
         }
     };
     this.init = function () {
@@ -208,16 +201,65 @@ function PlayAreaSVG() {
                 return d.y;
             })
             .attr('width', function (d) {
-                return 223;
+                if (!d.hasOwnProperty('width')) {
+                    d.width = 223;
+                }
+                return d.width;
             })
             .attr('height', function (d) {
-                return 310;
+                if (!d.hasOwnProperty('height')) {
+                    d.height = 310;
+                }
+                return d.height;
             })
             .call(this.drag);
         hand.exit().remove();
-        hand.on('mouseenter', function (d) {
+        hand.on('mouseenter', function showEnlargedCard(d) {
+            var originCard = d3.select(this),
+                scale = mainApp.playAreaSVG.scale;
+            d.originCard = originCard;
 
-        })
+            if (scale < 0.8) {
+                var newCardData = d3.select('#enlargedCard').selectAll('image')
+                    .data([d]);
+                mainApp.enlargedCard = newCardData.enter().append('image');
+                mainApp.enlargedCard
+                    .classed('enlarged', true)
+                    .attr('xlink:href', function (d) {
+                        return d.IMAGE_URL;
+                    })
+                    .attr('x', function (d) {
+                        d.enlargedX = d.x + (d.width * scale - d.width) / (2 * scale);
+                        return d.enlargedX;
+                    })
+                    .attr('y', function (d) {
+                        d.enlargedY = d.y + (d.height * scale - d.height) / (2 * scale);
+                        return d.enlargedY;
+                    })
+                    .attr('width', function (d) {
+                        d.enlargedWidth = d.width / scale;
+                        return d.enlargedWidth;
+                    })
+                    .attr('height', function (d) {
+                        d.enlargedHeight = d.height / scale;
+                        return d.enlargedHeight;
+                    })
+                    .on('mousemove', function (d) {
+                        var svgCoords = self.getSVGCoordinates(d3.event.x,
+                                                               d3.event.y);
+                        if (svgCoords.x < d.x ||
+                            svgCoords.x > d.x + d.width ||
+                            svgCoords.y < d.y ||
+                            svgCoords.y > d.y + d.height)
+                        {
+                            d3.select(this).remove();
+                        }
+                    })
+                mainApp.enlargedCard.call(self.drag);
+                newCardData.exit().remove();
+            }
+
+        });
     }
     this.applyViewBox = function () {
         self.svg.attr('viewBox', function() {
@@ -261,7 +303,7 @@ function PlayAreaSVG() {
         this.viewBox.width = this.viewBox.width / zoomFactor;
         this.viewBox.height = this.viewBox.height / zoomFactor;
         this.applyViewBox();
-        self.scaleFeatures();
+        // self.scaleSelectedCard();
     };
     this.zoomOut = function (pageX, pageY) {
         var zoomFactor = 1 / 1.35;
@@ -271,14 +313,14 @@ function PlayAreaSVG() {
         this.viewBox.width = this.viewBox.width / zoomFactor;
         this.viewBox.height = this.viewBox.height / zoomFactor;
         this.applyViewBox();
-        self.scaleFeatures();
+        // self.scaleSelectedCard();
     };
     this.centerOn = function (x, y) {
         this.viewBox.left = x - self.viewBox.width / 2;
         this.viewBox.top = y - self.viewBox.height / 2;
         this.applyViewBox();
     };
-    this.getMapPosition = function (pageX, pageY) {
+    this.getSVGCoordinates = function (pageX, pageY) {
         return {
             x: Math.round(this.viewBox.left + pageX / this.scale),
             y: Math.round(this.viewBox.top + pageY / this.scale)
@@ -291,7 +333,8 @@ function MainApp() {
     var self = this;
     this.playAreaSVG = null;
     this.coordDisplay = null;
-    this.addOrEditForm = null;
+    this.enlargedCard = null;
+    this.mouseIsDown = false;
 
     // cache data when feature is clicked
     this.infoCache = {};
@@ -300,9 +343,10 @@ function MainApp() {
         this.playAreaSVG = new PlayAreaSVG();
         this.playAreaSVG.init();
         this.coordDisplay = $('#coordDisplay');
+        this.enlargedCard = $('#enlargedCard');
     };
-    this.setCoordDisplay = function (x, z) {
-        this.coordDisplay.html('x: ' + x + ' z: ' + z);
+    this.setCoordDisplay = function (x, y) {
+        this.coordDisplay.html('x: ' + x + ' y: ' + y);
     };
     this.startMouse = function (pageX, pageY) {
         var mousePos;
@@ -322,8 +366,8 @@ function MainApp() {
             this.playAreaSVG.continuePan(pageX, pageY);
         // update cursor coordinates
         } else {
-            mousePos = this.playAreaSVG.getMapPosition(pageX,
-                                                     pageY);
+            mousePos = this.playAreaSVG.getSVGCoordinates(pageX,
+                                                          pageY);
             this.setCoordDisplay(mousePos.x, mousePos.y);
         }
     };
@@ -362,6 +406,9 @@ $(document).ready(function initialSetup() {
             mainApp.moveMouse(event.pageX, event.pageY);
         },
         'mouseup': function bodyMouseup(event) {
+            mainApp.endMouse(event.pageX, event.pageY);
+        },
+        'mouseleave': function bodyMouseup(event) {
             mainApp.endMouse(event.pageX, event.pageY);
         }
     });

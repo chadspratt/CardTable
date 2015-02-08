@@ -1,7 +1,7 @@
 body {
     overflow: hidden;
 }
-#playArea {
+#playAreaSVG {
     position: absolute;
     top: 0px;
     left: 0px;
