@@ -93,9 +93,19 @@ function PlayAreaSVG() {
         d3.event.sourceEvent.stopPropagation(); // silence other listeners
     });
     this.drag.on('drag', function (d) {
+        // put the card on top of other cards in its group
+        var parent = d3.select($(this).parent()[0]);
+        parent.selectAll('image')
+            .sort(function(a, b) {
+                if(a.ID === d.ID)   {
+                    return 1;
+                } else {
+                    return -1;
+                }
+            });
+        // move the card
         d.x += d3.event.dx;
         d.y += d3.event.dy;
-        // d3.event.sourceEvent.stopPropagation(); // silence other listeners
         d3.select(this)
             .attr('x', d.x)
             .attr('y', d.y);
