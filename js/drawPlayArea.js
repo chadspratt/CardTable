@@ -32,6 +32,23 @@ function TableData() {
         this.battlefield = [];
         this.graveyard = [];
 
+        var duplicateCards = [];
+        for (var i = 0; i < this.library.length; i++) {
+            var card = this.library[i]
+            // assign an ID to each card
+            card.CARD_INSTANCE_ID = i;
+            // create extra copies of duplicate cards
+            for (var j = 1; j < card.COUNT; j++) {
+                duplicateCards.push({
+                    NAME: card.NAME,
+                    IMAGE_URL: card.IMAGE_URL,
+                    COUNT: card.COUNT,
+                    CARD_INSTANCE_ID: this.library.length + duplicateCards.length
+                })
+            }
+        }
+        this.library = this.library.concat(duplicateCards);
+
         $('#libraryCount').text(this.library.length);
     };
     this.clearCounters = function () {
@@ -100,7 +117,9 @@ function PlayAreaSVG() {
         }
     });
     this.drag.on('drag', function (d) {
-        var img = d3.select(this);
+        var img = d3.select(this),
+            parent = d3.select($(img).parent()[0]);
+        // parent.append(img[0]);
         if (img.classed('enlarged')) {
             // move the enlarged card
             d.enlargedX += d3.event.dx;
@@ -118,10 +137,12 @@ function PlayAreaSVG() {
         var parent = d3.select($(img).parent()[0]);
         parent.selectAll('image')
             .sort(function(a, b) {
-                if(a.ID === d.ID)   {
+                if (a.CARD_INSTANCE_ID === d.CARD_INSTANCE_ID)   {
                     return 1;
-                } else {
+                } else if (b.CARD_INSTANCE_ID === d.CARD_INSTANCE_ID) {
                     return -1;
+                } else {
+                    return 0;
                 }
             });
         // move the card
@@ -181,8 +202,8 @@ function PlayAreaSVG() {
     this._drawCards = function () {
         $('#libraryCount').text(this.tableData.library.length);
         var hand = d3.select('#hand').selectAll('image')
-            .data(this.tableData.hand);
-            // , function (d) { return d; }
+            .data(this.tableData.hand,
+                  function (d) { return d.CARD_INSTANCE_ID; });
 
         hand.enter().append('image')
             .attr('xlink:href', function (d) {
