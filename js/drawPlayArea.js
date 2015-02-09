@@ -106,85 +106,6 @@ function PlayAreaSVG() {
     this.needUpdate = false;
     this.featureClicked = false;
 
-    this.drag = d3.behavior.drag();
-    this.drag.on('dragstart', function() {
-        d3.event.sourceEvent.stopPropagation(); // silence other listeners
-        // if it is an enlarged card, make it transparent so you can see where
-        // you're dragging the actual-size card
-        var img = d3.select(this);
-        if (img.classed('enlarged')) {
-            img.attr('opacity', '0.0');
-        }
-    });
-    this.drag.on('drag', function (d) {
-        var img = d3.select(this),
-            parent = d3.select($(img).parent()[0]);
-        // parent.append(img[0]);
-        if (img.classed('enlarged')) {
-            // move the enlarged card
-            d.enlargedX += d3.event.dx;
-            d.enlargedY += d3.event.dy;
-
-            img
-                .attr('x', d.enlargedX)
-                .attr('y', d.enlargedY);
-
-            // move source card beneath it too
-            img = d.originCard;
-        }
-
-        // put the card on top of other cards in its group
-        var parent = d3.select($(img).parent()[0]);
-        parent.selectAll('image')
-            .sort(function(a, b) {
-                if (a.CARD_INSTANCE_ID === d.CARD_INSTANCE_ID)   {
-                    return 1;
-                } else if (b.CARD_INSTANCE_ID === d.CARD_INSTANCE_ID) {
-                    return -1;
-                } else {
-                    return 0;
-                }
-            });
-        // move the card
-        d.x += d3.event.dx;
-        d.y += d3.event.dy;
-        img
-            .attr('x', d.x)
-            .attr('y', d.y);
-    });
-    this.drag.on('dragend', function () {
-        var img = d3.select(this);
-        if (img.classed('enlarged')) {
-            img.attr('opacity', '1.0');
-        }
-    })
-
-    this.resizeSVG = function () {
-        // http://stackoverflow.com/a/16265661/225730
-        var w = window,
-            d = document,
-            e = d.documentElement,
-            g = d.getElementsByTagName('body')[0];
-
-        self.svgWidth = (w.innerWidth || e.clientWidth || g.clientWidth) - 2;
-        self.svgHeight = (w.innerHeight || e.clientHeight || g.clientHeight) - 2;
-
-        self.svg.attr('width', self.svgWidth)
-                   .attr('height', self.svgHeight);
-        // check that map is initialized, which it should be
-        if (self.scale !== 0) {
-            self.viewBox.left -= (self.svgWidth / self.scale - self.viewBox.width) / 2;
-            self.viewBox.top -= (self.svgHeight / self.scale - self.viewBox.height) / 2;
-            self.viewBox.width = self.svgWidth / self.scale;
-            self.viewBox.height = self.svgHeight / self.scale;
-            self.svg.attr('viewBox', function() {
-                return self.viewBox.left + ' ' +
-                       self.viewBox.top + ' ' +
-                       self.viewBox.width + ' ' +
-                       self.viewBox.height;
-            });
-        }
-    };
     this.init = function () {
         var canvasOffset;
         this.svg = d3.select('#playAreaSVG');
@@ -195,6 +116,60 @@ function PlayAreaSVG() {
         this.y = canvasOffset.top;
         this.tableData = new TableData();
     };
+
+    this.drag = d3.behavior.drag();
+    this.drag.on('dragstart', function(d) {
+        d3.event.sourceEvent.stopPropagation(); // silence other listeners
+        // if it is an enlarged card, make it transparent so you can see where
+        // you're dragging the actual-size card
+        var img = d3.select(this),
+            parent = d3.select($(this).parent()[0]);
+        if (img.classed('enlarged')) {
+            img.attr('opacity', '0.0');
+            img = d.originCard;
+            parent = d3.select($(d.originCard[0]).parent()[0]);
+        }
+        // put the card on top of other cards in its group
+        parent.selectAll('image')
+            .sort(function(a, b) {
+                if (a.CARD_INSTANCE_ID === d.CARD_INSTANCE_ID)   {
+                    return 1;
+                } else if (b.CARD_INSTANCE_ID === d.CARD_INSTANCE_ID) {
+                    return -1;
+                } else {
+                    return 0;
+                }
+            });
+    });
+    this.drag.on('drag', function (d) {
+        var img = d3.select(this),
+            parent = d3.select($(this).parent()[0]);
+        // parent.append(img[0]);
+        if (img.classed('enlarged')) {
+            // move the enlarged card
+            d.enlargedX += d3.event.dx;
+            d.enlargedY += d3.event.dy;
+
+            img.attr('x', d.enlargedX)
+                .attr('y', d.enlargedY);
+
+            // move source card beneath it too
+            img = d.originCard;
+        }
+
+        // move the card
+        d.x += d3.event.dx;
+        d.y += d3.event.dy;
+        img.attr('x', d.x)
+            .attr('y', d.y);
+    });
+    this.drag.on('dragend', function () {
+        var img = d3.select(this);
+        if (img.classed('enlarged')) {
+            img.attr('opacity', '1.0');
+        }
+    })
+
     this.drawCard = function () {
         this.tableData.drawCard();
         this._drawCards();
@@ -282,6 +257,32 @@ function PlayAreaSVG() {
 
         });
     }
+    this.resizeSVG = function () {
+        // http://stackoverflow.com/a/16265661/225730
+        var w = window,
+            d = document,
+            e = d.documentElement,
+            g = d.getElementsByTagName('body')[0];
+
+        self.svgWidth = (w.innerWidth || e.clientWidth || g.clientWidth) - 2;
+        self.svgHeight = (w.innerHeight || e.clientHeight || g.clientHeight) - 2;
+
+        self.svg.attr('width', self.svgWidth)
+                   .attr('height', self.svgHeight);
+        // check that map is initialized, which it should be
+        if (self.scale !== 0) {
+            self.viewBox.left -= (self.svgWidth / self.scale - self.viewBox.width) / 2;
+            self.viewBox.top -= (self.svgHeight / self.scale - self.viewBox.height) / 2;
+            self.viewBox.width = self.svgWidth / self.scale;
+            self.viewBox.height = self.svgHeight / self.scale;
+            self.svg.attr('viewBox', function() {
+                return self.viewBox.left + ' ' +
+                       self.viewBox.top + ' ' +
+                       self.viewBox.width + ' ' +
+                       self.viewBox.height;
+            });
+        }
+    };
     this.applyViewBox = function () {
         self.svg.attr('viewBox', function() {
             return self.viewBox.left + ' ' +
