@@ -8,17 +8,17 @@ $getStateQuery = $connection->prepare("SELECT * FROM CurrentState
 $addQuery = $connection->prepare("INSERT INTO CurrentState
                                  (room, player, zone, objectType, objectId,
                                  objectImageUrl, objectXPos, objectYPos)
-                                 SELECT ?, ?, ?, ?, ?, ?, ?, ?;");
+                                 SELECT ?, ?, ?, ?, ?, ?, ?, ?");
 $updateQuery = $connection->prepare("UPDATE CurrentState SET
                                     player = ?, zone = ?, objectId = ?,
                                     objectImageUrl = ?, objectXPos = ?, objectYPos = ?
                                     WHERE room = ? AND player = ? AND
-                                    objectType = ? AND objectId = ?;");
+                                    objectType = ? AND objectId = ?");
 $removeQuery = $connection->prepare("DELETE FROM CurrentState
                                     WHERE room = ? AND player = ? AND
-                                    objectType = ? AND objectId = ?;");
+                                    objectType = ? AND objectId = ?");
 $markAsUpdatedQuery = $connection->prepare("INSERT INTO LastRoomUpdate
-                                    (room) SELECT ?;");
+                                    (room) SELECT ?");
 $checkForUpdateQuery = $connection->prepare("SELECT id FROM LastRoomUpdate
                                     WHERE room = ? AND id > ?");
 
@@ -29,13 +29,25 @@ if ($_POST["action"] === "get_state")
     {
         $_SESSION["LastRoomUpdateId"] = -1;
     }
-    $getStateQuery->bind_param("si",
-                               $_POST["room"],
-                               $_POST[$_SESSION["LastRoomUpdateId"]]);
-    // XXX check for a result
+    $checkForUpdateQuery->bind_param("si",
+                                     $_POST["room"],
+                                     $_POST[$_SESSION["LastRoomUpdateId"]]);
+    while (true)
+    {
+        $checkForUpdateQuery->execute();
+        $result = $checkForUpdateQuery->get_result()->fetch_all();
+        if (count($result) > 0)
+        {
+            $_SESSION["LastRoomUpdateId"] = $result[0]->id;
+            break;
+        }
+        sleep(0.2);
+    }
+
+    $getStateQuery->bind_param("s", $_POST["room"]);
     $getStateQuery->execute();
-    $result = $getStateQuery->get_result();
-    echo json_encode($result->fetch_all());
+    $result = $getStateQuery->get_result()->fetch_all();
+    echo json_encode($result);
 }
 else
 {
@@ -76,6 +88,8 @@ else
                                      $_POST["objectId"][$i]);
             $removeQuery->execute();
         }
+        $markAsUpdatedQuery->bind_param("s", $_POST["room"][$i]);
+        $_SESSION["LastRoomUpdateId"] = $connection->insert_id;
     }
 }
 ?>
