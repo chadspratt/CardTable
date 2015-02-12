@@ -21,34 +21,65 @@ function TableData() {
     this.deckCSV = null;
     this.library = [];
     this.hand = [];
-    this.battlefield = [];
-    this.graveyard = [];
+    this.inPlay = [];
+    this.outOfPlay = [];
     this.counters = [];
+    this.room = null;
+    this.player = null;
+
+    this._addCards = function (cards, zone) {
+        var objectIds = [],
+            imageUrls = [],
+            xPositions = [],
+            yPositions = [];
+        for (var i = 0; i < cards.length; i++) {
+            objectIds.push(cards[i].object_id);
+            imageUrls.push(cards[i].image_url);
+            xPositions.push(cards[i].x);
+            yPositions.push(cards[i].y);
+        }
+        $.post('tableState.php', {
+                    action: 'add',
+                    room: this.room,
+                    player: this.player,
+                    zone: zone,
+                    object_type: 'card',
+                    object_id: objectIds,
+                    image_url: imageUrls,
+                    object_x_pos: xPositions,
+                    object_y_pos: yPositions});
+
+    }
 
     this.loadDeckFromCSV = function (deckCSV) {
         this.deckCSV = deckCSV;
         this.library = $.csv.toObjects(deckCSV);
         this.hand = [];
-        this.battlefield = [];
-        this.graveyard = [];
+        this.inPlay = [];
+        this.outOfPlay = [];
 
         var duplicateCards = [];
         for (var i = 0; i < this.library.length; i++) {
-            var card = this.library[i]
+            var card = this.library[i];
             // assign an ID to each card
-            card.CARD_INSTANCE_ID = i;
+            card.object_id = i;
+            card.zone = 'library';
+            card.object_type = 'card';
+
             // create extra copies of duplicate cards
-            for (var j = 1; j < card.COUNT; j++) {
+            for (var j = 1; j < card.count; j++) {
                 duplicateCards.push({
-                    NAME: card.NAME,
-                    IMAGE_URL: card.IMAGE_URL,
-                    COUNT: card.COUNT,
-                    CARD_INSTANCE_ID: this.library.length + duplicateCards.length
-                })
+                    // NAME: card.NAME,
+                    image_url: card.image_url,
+                    count: card.count,
+                    object_id: this.library.length + duplicateCards.length,
+                    zone: 'library',
+                    object_type: 'card'
+                });
             }
         }
         this.library = this.library.concat(duplicateCards);
-
+        this._addCards(this.library, 'library');
         $('#libraryCount').text(this.library.length);
     };
     this.clearCounters = function () {
@@ -75,7 +106,7 @@ function TableData() {
     this.playCard = function (cardId) {
         for (var i = 0; i < this.hand.length; i++) {
             if (this.hand[i].ID == cardId) {
-                this.battlefield.push(this.hand[i]);
+                this.inPlay.push(this.hand[i]);
                 this.hand.splice(i, 1);
                 break;
             }
@@ -132,9 +163,9 @@ function PlayAreaSVG() {
         // put the card on top of other cards in its group
         parent.selectAll('image')
             .sort(function(a, b) {
-                if (a.CARD_INSTANCE_ID === d.CARD_INSTANCE_ID)   {
+                if (a.object_id === d.object_id)   {
                     return 1;
-                } else if (b.CARD_INSTANCE_ID === d.CARD_INSTANCE_ID) {
+                } else if (b.object_id === d.object_id) {
                     return -1;
                 } else {
                     return 0;
@@ -166,7 +197,7 @@ function PlayAreaSVG() {
     this.drag.on('dragend', function () {
         var img = d3.select(this);
         if (img.classed('enlarged')) {
-            img.attr('opacity', '1.0');
+            // img.attr('opacity', '1.0');
         }
     })
 
@@ -178,11 +209,11 @@ function PlayAreaSVG() {
         $('#libraryCount').text(this.tableData.library.length);
         var hand = d3.select('#hand').selectAll('image')
             .data(this.tableData.hand,
-                  function (d) { return d.CARD_INSTANCE_ID; });
+                  function (d) { return d.object_id; });
 
         hand.enter().append('image')
             .attr('xlink:href', function (d) {
-                return d.IMAGE_URL;
+                return d.image_url;
             })
             .attr('x', function (d, i) {
                 if (!d.hasOwnProperty('x')) {
@@ -222,7 +253,7 @@ function PlayAreaSVG() {
                 mainApp.enlargedCard
                     .classed('enlarged', true)
                     .attr('xlink:href', function (d) {
-                        return d.IMAGE_URL;
+                        return d.image_url;
                     })
                     .attr('x', function (d) {
                         d.enlargedX = d.x + (d.width * scale - d.width) / (2 * scale);
@@ -459,5 +490,11 @@ $(document).ready(function initialSetup() {
     });
     $('#drawCard').on('click', function drawCard() {
         mainApp.playAreaSVG.drawCard();
+    });
+    $('#setRoom').on('click', function setRoom() {
+        mainApp.playAreaSVG.tableData.room = $('#roomName').val();
+    });
+    $('#setName').on('click', function setName() {
+        mainApp.playAreaSVG.tableData.player = $('#playerName').val();
     });
 });

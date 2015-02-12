@@ -21,9 +21,9 @@
   <g id="cards">
     <g id="library"></g>
     <g id="hand"></g>
-    <g id="battlefield"></g>
-    <g id="graveyard"></g>
-    <g id="exile"></g>
+    <g id="inPlay"></g>
+    <g id="outOfPlay"></g>
+    <g id="furtherOutOfPlay"></g>
   </g>
   <g id="counters"></g>
   <g id="enlargedCard"></g>
@@ -42,7 +42,7 @@
 
 <div id="coordDisplay" class="overlayItem">x: z:</div>
 
-<div id="gameControls">
+<form id="gameControls">
   <div id="loadDeckBox" class="overlayItem inline">
     <div id="loadDeckForm">
       <textarea type="text" id="deckCSV" value="" rows="10" cols="50"></textarea>
@@ -69,7 +69,7 @@
     <button id="drawCard">Draw</button>
     <button id="shuffleLibrary">Shuffle</button>
   </div>
-</div>
+</form>
 
 <div id="mouseoverBox" class="overlayItem"></div>
 
