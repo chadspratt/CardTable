@@ -27,28 +27,56 @@ function TableData() {
     this.room = null;
     this.player = null;
 
-    this._addCards = function (cards, zone) {
-        var objectIds = [],
-            imageUrls = [],
-            xPositions = [],
-            yPositions = [];
-        for (var i = 0; i < cards.length; i++) {
-            objectIds.push(cards[i].object_id);
-            imageUrls.push(cards[i].image_url);
-            xPositions.push(cards[i].x);
-            yPositions.push(cards[i].y);
+    this._addObjects = function (objectType, objects, zone) {
+        if (this.room !== null && this.player !== null) {
+            var objectIds = [],
+                imageUrls = [],
+                xPositions = [],
+                yPositions = [];
+            for (var i = 0; i < objects.length; i++) {
+                objectIds.push(objects[i].id);
+                imageUrls.push(objects[i].image_url);
+                xPositions.push(objects[i].x);
+                yPositions.push(objects[i].y);
+            }
+            $.post('tableState.php', {
+                        action: 'add',
+                        room: this.room,
+                        player: this.player,
+                        zone: zone,
+                        type: objectType,
+                        id: objectIds,
+                        image_url: imageUrls,
+                        x_pos: xPositions,
+                        y_pos: yPositions})
+            .done(function whatHappened(result) {
+                $('#deckCSV').val(result);
+            });
         }
-        $.post('tableState.php', {
-                    action: 'add',
-                    room: this.room,
-                    player: this.player,
-                    zone: zone,
-                    object_type: 'card',
-                    object_id: objectIds,
-                    image_url: imageUrls,
-                    object_x_pos: xPositions,
-                    object_y_pos: yPositions});
-
+    }
+    this._updateObject = function (objectType, object, zone) {
+        if (this.room !== null && this.player !== null) {
+            $.post('tableState.php', {
+                        action: 'update',
+                        room: this.room,
+                        player: this.player,
+                        zone: zone,
+                        type: objectType,
+                        id: object.id,
+                        image_url: object.imageUrl,
+                        x_pos: object.x,
+                        y_pos: object.y});
+        }
+    }
+    this._removeObject = function (objectType, object, zone) {
+        if (this.room !== null && this.player !== null) {
+            $.post('tableState.php', {
+                        action: 'remove',
+                        room: this.room,
+                        player: this.player,
+                        type: objectType,
+                        id: object.id});
+        }
     }
 
     this.loadDeckFromCSV = function (deckCSV) {
@@ -62,9 +90,9 @@ function TableData() {
         for (var i = 0; i < this.library.length; i++) {
             var card = this.library[i];
             // assign an ID to each card
-            card.object_id = i;
+            card.id = i;
             card.zone = 'library';
-            card.object_type = 'card';
+            card.type = 'card';
 
             // create extra copies of duplicate cards
             for (var j = 1; j < card.count; j++) {
@@ -72,14 +100,14 @@ function TableData() {
                     // NAME: card.NAME,
                     image_url: card.image_url,
                     count: card.count,
-                    object_id: this.library.length + duplicateCards.length,
+                    id: this.library.length + duplicateCards.length,
                     zone: 'library',
-                    object_type: 'card'
+                    type: 'card'
                 });
             }
         }
         this.library = this.library.concat(duplicateCards);
-        this._addCards(this.library, 'library');
+        this._addObjects('card', this.library, 'library');
         $('#libraryCount').text(this.library.length);
     };
     this.clearCounters = function () {
@@ -146,6 +174,8 @@ function PlayAreaSVG() {
         this.x = canvasOffset.left;
         this.y = canvasOffset.top;
         this.tableData = new TableData();
+        this.tableData.room = $('#roomName').val();
+        this.tableData.player = $('#playerName').val();
     };
 
     this.drag = d3.behavior.drag();
@@ -163,9 +193,9 @@ function PlayAreaSVG() {
         // put the card on top of other cards in its group
         parent.selectAll('image')
             .sort(function(a, b) {
-                if (a.object_id === d.object_id)   {
+                if (a.id === d.id)   {
                     return 1;
-                } else if (b.object_id === d.object_id) {
+                } else if (b.id === d.id) {
                     return -1;
                 } else {
                     return 0;
@@ -209,7 +239,7 @@ function PlayAreaSVG() {
         $('#libraryCount').text(this.tableData.library.length);
         var hand = d3.select('#hand').selectAll('image')
             .data(this.tableData.hand,
-                  function (d) { return d.object_id; });
+                  function (d) { return d.id; });
 
         hand.enter().append('image')
             .attr('xlink:href', function (d) {
@@ -248,7 +278,7 @@ function PlayAreaSVG() {
 
             if (scale < 0.8) {
                 var newCardData = d3.select('#enlargedCard').selectAll('image')
-                    .data([d]);
+                    .data([d], function (d) {return d.image_url; });
                 mainApp.enlargedCard = newCardData.enter().append('image');
                 mainApp.enlargedCard
                     .classed('enlarged', true)
@@ -281,6 +311,11 @@ function PlayAreaSVG() {
                         {
                             d3.select(this).remove();
                         }
+                    })
+                    // backup in case the mouse doesn't get caught in the
+                    // mousemove removal zone
+                    .on('mouseleave', function (d) {
+                        d3.select(this).remove();
                     })
                 mainApp.enlargedCard.call(self.drag);
                 newCardData.exit().remove();

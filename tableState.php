@@ -6,23 +6,29 @@ $connection = GetDatabaseConnection();
 $getStateQuery = $connection->prepare("SELECT * FROM CurrentState
                                       WHERE room = ?");
 $addQuery = $connection->prepare("INSERT INTO CurrentState
-                                 (room, player, zone, objectType, objectId,
-                                 objectImageUrl, objectXPos, objectYPos)
+                                 (room, player, zone, type, id,
+                                 imageUrl, xPos, yPos)
                                  SELECT ?, ?, ?, ?, ?, ?, ?, ?");
 $updateQuery = $connection->prepare("UPDATE CurrentState SET
-                                    player = ?, zone = ?, objectId = ?,
-                                    objectImageUrl = ?, objectXPos = ?, objectYPos = ?
+                                    player = ?, zone = ?, id = ?,
+                                    imageUrl = ?, xPos = ?, yPos = ?
                                     WHERE room = ? AND player = ? AND
-                                    objectType = ? AND objectId = ?");
+                                    type = ? AND id = ?");
 $removeQuery = $connection->prepare("DELETE FROM CurrentState
                                     WHERE room = ? AND player = ? AND
-                                    objectType = ? AND objectId = ?");
+                                    type = ? AND id = ?");
 $removeAllQuery = $connection->prepare("DELETE FROM CurrentState
                                        WHERE room = ? AND player = ?");
 $markAsUpdatedQuery = $connection->prepare("INSERT INTO LastRoomUpdate
                                            (room) SELECT ?");
 $checkForUpdateQuery = $connection->prepare("SELECT id FROM LastRoomUpdate
                                             WHERE room = ? AND id > ?");
+// for debugging
+if ($_SERVER['REQUEST_METHOD'] === 'GET')
+{
+    $_POST = $_GET;
+}
+var_dump($_POST);
 
 if ($_POST["action"] === "get_state")
 {
@@ -55,17 +61,17 @@ else
 {
     if ($_POST["action"] === "add")
     {
-        for ($i=0; $i < count($_POST["object_id"]); $i++)
+        for ($i=0; $i < count($_POST["id"]); $i++)
         {
             $addQuery->bind_param("ssssisii",
                                   $_POST["room"],
                                   $_POST["player"],
                                   $_POST["zone"],
-                                  $_POST["object_type"],
-                                  $_POST["object_id"][$i],
+                                  $_POST["type"],
+                                  $_POST["id"][$i],
                                   $_POST["image_url"][$i],
-                                  $_POST["object_x_pos"][$i],
-                                  $_POST["object_y_pos"][$i]);
+                                  $_POST["x_pos"][$i],
+                                  $_POST["y_pos"][$i]);
             $addQuery->execute();
         }
     }
@@ -74,12 +80,12 @@ else
         $updateQuery->bind_param("ssiisssi",
                                  $_POST["zone"],
                                  $_POST["image_url"],
-                                 $_POST["object_x_pos"],
-                                 $_POST["object_y_pos"],
+                                 $_POST["x_pos"],
+                                 $_POST["y_pos"],
                                  $_POST["room"],
                                  $_POST["player"],
-                                 $_POST["object_type"],
-                                 $_POST["object_id"]);
+                                 $_POST["type"],
+                                 $_POST["id"]);
         $updateQuery->execute();
     }
     elseif ($_POST["action"] === "remove")
@@ -87,8 +93,8 @@ else
         $removeQuery->bind_param("sssi",
                                  $_POST["room"],
                                  $_POST["player"],
-                                 $_POST["object_type"],
-                                 $_POST["object_id"]);
+                                 $_POST["type"],
+                                 $_POST["id"]);
         $removeQuery->execute();
     }
     elseif ($_POST["action"] === "remove_all")
