@@ -3,59 +3,81 @@
 require_once "../../db_connect/cards.inc";
 
 $connection = GetDatabaseConnection();
-$getStateQuery = $connection->prepare("SELECT * FROM CurrentState
+$getStateQuery = $connection->prepare("SELECT player, zone, type, id,
+                                      imageUrl, xPos, yPos FROM CurrentState
                                       WHERE room = ?");
 $addQuery = $connection->prepare("INSERT INTO CurrentState
                                  (room, player, zone, type, id,
                                  imageUrl, xPos, yPos)
                                  SELECT ?, ?, ?, ?, ?, ?, ?, ?");
 $updateQuery = $connection->prepare("UPDATE CurrentState SET
-                                    player = ?, zone = ?, id = ?,
-                                    imageUrl = ?, xPos = ?, yPos = ?
+                                    zone = ?, xPos = ?, yPos = ?
                                     WHERE room = ? AND player = ? AND
                                     type = ? AND id = ?");
 $removeQuery = $connection->prepare("DELETE FROM CurrentState
                                     WHERE room = ? AND player = ? AND
                                     type = ? AND id = ?");
-$removeAllQuery = $connection->prepare("DELETE FROM CurrentState
-                                       WHERE room = ? AND player = ?");
+$removePlayerQuery = $connection->prepare("DELETE FROM CurrentState
+                                          WHERE room = ? AND player = ?");
 $markAsUpdatedQuery = $connection->prepare("INSERT INTO LastRoomUpdate
                                            (room) SELECT ?");
 $checkForUpdateQuery = $connection->prepare("SELECT id FROM LastRoomUpdate
-                                            WHERE room = ? AND id > ?");
+                                            WHERE room = ? AND id > ?
+                                            ORDER BY id DESC");
+
 // for debugging
 if ($_SERVER['REQUEST_METHOD'] === 'GET')
 {
     $_POST = $_GET;
 }
-var_dump($_POST);
+// var_dump($_POST);
 
 if ($_POST["action"] === "get_state")
 {
-    session_start();
-    if (!array_key_exists("lastRoomUpdateId", $_SESSION))
-    {
-        $_SESSION["lastRoomUpdateId"] = -1;
-    }
     $checkForUpdateQuery->bind_param("si",
                                      $_POST["room"],
-                                     $_POST[$_SESSION["lastRoomUpdateId"]]);
+                                     $_POST["last_update_id"]);
+    // wait for new data
+    $totalTimeSlept = 0;
     while (true)
     {
         $checkForUpdateQuery->execute();
-        $result = $checkForUpdateQuery->get_result()->fetch_all();
-        if (count($result) > 0)
+        $checkForUpdateQuery->bind_result($changeId);
+        if ($checkForUpdateQuery->fetch())
         {
-            $_SESSION["lastRoomUpdateId"] = $result[0]->id;
+            $checkForUpdateQuery->close();
             break;
         }
-        sleep(0.2);
+        $totalTimeSlept += 0.2;
+        // max wait time
+        if ($totalTimeSlept > 5)
+        {
+            echo '{"no_changes":"true"}';
+            return;
+        }
+        usleep(200000);
     }
 
     $getStateQuery->bind_param("s", $_POST["room"]);
     $getStateQuery->execute();
-    $result = $getStateQuery->get_result()->fetch_all();
-    echo json_encode($result);
+    $getStateQuery->bind_result($player, $zone, $type, $id,
+                                $imageUrl, $xPos, $yPos);
+    $results = [];
+    while ($getStateQuery->fetch())
+    {
+        $row = [
+            "player" => $player,
+            "zone" => $zone,
+            "type" => $type,
+            "id" => $id,
+            "imageUrl" => $imageUrl,
+            "xPos" => $xPos,
+            "yPos" => $yPos
+        ];
+        array_push($results, $row);
+    }
+    echo json_encode(array("change_id" => $changeId,
+                           "results" => $results));
 }
 else
 {
@@ -74,12 +96,12 @@ else
                                   $_POST["y_pos"][$i]);
             $addQuery->execute();
         }
+        $addQuery->close();
     }
     elseif ($_POST["action"] === "update")
     {
-        $updateQuery->bind_param("ssiisssi",
+        $updateQuery->bind_param("siisssi",
                                  $_POST["zone"],
-                                 $_POST["image_url"],
                                  $_POST["x_pos"],
                                  $_POST["y_pos"],
                                  $_POST["room"],
@@ -87,6 +109,7 @@ else
                                  $_POST["type"],
                                  $_POST["id"]);
         $updateQuery->execute();
+        $updateQuery->close();
     }
     elseif ($_POST["action"] === "remove")
     {
@@ -96,15 +119,22 @@ else
                                  $_POST["type"],
                                  $_POST["id"]);
         $removeQuery->execute();
+        $removeQuery->close();
     }
     elseif ($_POST["action"] === "remove_all")
     {
-        $removeAllQuery->bind_param("s",
-                                    $_POST["room"],
-                                    $_POST["player"]);
-        $removeAllQuery->execute();
+        $removePlayerQuery->bind_param("ss",
+                                       $_POST["room"],
+                                       $_POST["player"]);
+        $removePlayerQuery->execute();
+        $removePlayerQuery->close();
     }
+
     $markAsUpdatedQuery->bind_param("s", $_POST["room"]);
-    $_SESSION["lastRoomUpdateId"] = $connection->insert_id;
+    $markAsUpdatedQuery->execute();
+    $lastUpdateId = $connection->insert_id;
+    echo '{"last_update_id":"$lastUpdateId"}';
 }
+
+$connection->close();
 ?>

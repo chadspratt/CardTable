@@ -18,16 +18,9 @@
 <body>
 
 <svg id="playAreaSVG">
-  <g id="cards">
-    <g id="library"></g>
-    <g id="hand"></g>
-    <g id="inPlay"></g>
-    <g id="outOfPlay"></g>
-    <g id="furtherOutOfPlay"></g>
-  </g>
+  <g id="players"></g>
   <g id="counters"></g>
   <g id="enlargedCard"></g>
-  <g id="skeuomorphicTable"></g>
 </svg>
 
 <div id="viewControls" class="overlayItem">

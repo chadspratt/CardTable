@@ -3,31 +3,57 @@ var mainApp,
     // used for a popup for adding/editing wiki data
     handWindow = null;
 
-function Boundary(centerX, centerY, width, height) {
+function Player(name) {
     'use strict';
-    this.centerX = centerX;
-    this.centerY = centerY;
-    this.width = width;
-    this.height = height;
-    this.left = centerX - width / 2;
-    this.right = this.left + width;
-    this.top = centerY - height / 2;
-    this.bottom = this.top + height;
+    this.name = name;
+    this.zones = {};
+    this.counters = [];
+
+    this.getZonesAsArray = function () {
+        var zoneArray = [];
+        for (var zone in this.zones) {
+            if (this.zones.hasOwnProperty(zone) &&
+                zone !== 'library') {
+                zoneArray.push(this.zones[zone]);
+            }
+        }
+        return zoneArray;
+    };
+}
+
+function Zone(name) {
+    'use strict';
+    this.name = name;
+    this.cards = [];
 }
 
 function TableData() {
     'use strict';
     var self = this;
     this.deckCSV = null;
-    this.library = [];
-    this.hand = [];
-    this.inPlay = [];
-    this.outOfPlay = [];
-    this.counters = [];
+    // this.library = [];
+    // this.hand = [];
+    // this.inPlay = [];
+    // this.outOfPlay = [];
+    // this.counters = [];
     this.room = null;
+    this.playerName = null;
     this.player = null;
+    this.players = {};
+    this.lastUpdateId = -1;
 
-    this._addObjects = function (objectType, objects, zone) {
+    this.setRoom = function (roomName) {
+        this.room = roomName;
+    };
+    this.setPlayer = function (playerName) {
+        this.playerName = playerName;
+        if (!this.players.hasOwnProperty(playerName)) {
+            this.players[playerName] = new Player(playerName);
+        }
+        this.player = this.players[playerName];
+    };
+
+    this._dbAddObjects = function (objectType, objects, zone) {
         if (this.room !== null && this.player !== null) {
             var objectIds = [],
                 imageUrls = [],
@@ -39,57 +65,124 @@ function TableData() {
                 xPositions.push(objects[i].x);
                 yPositions.push(objects[i].y);
             }
-            $.post('tableState.php', {
+            $.post('tableState.php',
+                    {
                         action: 'add',
                         room: this.room,
-                        player: this.player,
+                        player: this.playerName,
                         zone: zone,
                         type: objectType,
-                        id: objectIds,
-                        image_url: imageUrls,
-                        x_pos: xPositions,
-                        y_pos: yPositions})
-            .done(function whatHappened(result) {
-                $('#deckCSV').val(result);
-            });
+                        'id[]': objectIds,
+                        'image_url[]': imageUrls,
+                        'x_pos[]': xPositions,
+                        'y_pos[]': yPositions
+                    },
+                    function (data) {
+                        self.lastUpdateId = data.last_update_id;
+                    },
+                    'json');
         }
-    }
-    this._updateObject = function (objectType, object, zone) {
+    };
+    this.dbUpdateObject = function (object) {
         if (this.room !== null && this.player !== null) {
-            $.post('tableState.php', {
+            $.post('tableState.php',
+                    {
                         action: 'update',
                         room: this.room,
-                        player: this.player,
-                        zone: zone,
-                        type: objectType,
+                        player: this.playerName,
+                        zone: object.zone,
+                        type: object.type,
                         id: object.id,
-                        image_url: object.imageUrl,
+                        image_url: object.image_url,
                         x_pos: object.x,
-                        y_pos: object.y});
+                        y_pos: object.y
+                    },
+                    function (data) {
+                        self.lastUpdateId = data.last_update_id;
+                    },
+                    'json');
         }
-    }
-    this._removeObject = function (objectType, object, zone) {
+    };
+    this._dbRemoveObject = function (objectType, object, zone) {
         if (this.room !== null && this.player !== null) {
-            $.post('tableState.php', {
+            $.post('tableState.php',
+                    {
                         action: 'remove',
                         room: this.room,
-                        player: this.player,
+                        player: this.playerName,
                         type: objectType,
-                        id: object.id});
+                        id: object.id
+                    },
+                    function (data) {
+                        self.lastUpdateId = data.last_update_id;
+                    },
+                    'json');
         }
     }
+    this._dbRemovePlayerObjects = function () {
+        if (this.room !== null && this.player !== null) {
+            $.post('tableState.php',
+                    {
+                        action: 'remove_all',
+                        room: this.room,
+                        player: this.playerName
+                    },
+                    function (data) {
+                        self.lastUpdateId = data.last_update_id;
+                    },
+                    'json');
+        }
+    }
+
+    this.processRoomState = function (newData) {
+        // clear old data
+        this.players = {};
+        this.lastUpdateId = newData.change_id;
+        for (var i = 0; i < newData.results.length; i++) {
+            var object = newData.results[i];
+            if (!this.players.hasOwnProperty(object.player)) {
+                this.players[object.player] = new Player(object.player);
+            }
+            var player = this.players[object.player];
+            if (!player.zones.hasOwnProperty(object.zone)) {
+                player.zones[object.zone] = new Zone(object.zone);
+            }
+            var zone = player.zones[object.zone];
+
+            if (object.type === 'card') {
+                zone.cards.push({
+                    type: object.type,
+                    zone: object.zone,
+                    id: object.id,
+                    image_url: object.imageUrl,
+                    x: object.xPos,
+                    y: object.yPos,
+                });
+            } else if (object.type === 'counter') {
+                player.counters.push({
+                    type: object.type,
+                    id: object.id,
+                    image_url: object.imageUrl,
+                    x: object.xPos,
+                    y: object.yPos,
+                });
+            }
+        }
+        this.player = this.players[this.playerName];
+    };
 
     this.loadDeckFromCSV = function (deckCSV) {
         this.deckCSV = deckCSV;
-        this.library = $.csv.toObjects(deckCSV);
-        this.hand = [];
-        this.inPlay = [];
-        this.outOfPlay = [];
+        this._dbRemovePlayerObjects();
+        this.player.zones = {};
+        this.player.zones['library'] = new Zone('library');
+        this.player.zones['library'].cards = $.csv.toObjects(deckCSV);
 
-        var duplicateCards = [];
-        for (var i = 0; i < this.library.length; i++) {
-            var card = this.library[i];
-            // assign an ID to each card
+        var duplicateCards = [],
+            library = this.player.zones['library'].cards;
+        for (var i = 0; i < library.length; i++) {
+            var card = library[i];
+            // assign an id to each card
             card.id = i;
             card.zone = 'library';
             card.type = 'card';
@@ -100,46 +193,93 @@ function TableData() {
                     // NAME: card.NAME,
                     image_url: card.image_url,
                     count: card.count,
-                    id: this.library.length + duplicateCards.length,
+                    id: library.length + duplicateCards.length,
                     zone: 'library',
                     type: 'card'
                 });
             }
         }
-        this.library = this.library.concat(duplicateCards);
-        this._addObjects('card', this.library, 'library');
-        $('#libraryCount').text(this.library.length);
+        library = library.concat(duplicateCards);
+        this.player.zones['library'].cards = library;
+        this._dbAddObjects('card', library, 'library');
+        $('#libraryCount').text(library.length);
     };
     this.clearCounters = function () {
-        this.counters = [];
-    }
+        this.player.counters = [];
+    };
     this.resetDeck = function () {
-        this.library = $.csv.toObjects(deckCSV);
-        $('#libraryCount').text(this.library.length);
-    }
+        for (zone in this.player.zones) {
+            if (this.player.zones.hasOwnProperty(zone) &&
+                    zone !== 'library') {
+                this.player.zones['library'].cards.concat(this.player.zones[zone].cards);
+                this.player.zones[zone].cards = [];
+            }
+        }
+        $('#libraryCount').text(this.player.zones['library'].length);
+        this.shuffleLibrary();
+    };
 
     this.shuffleLibrary = function () {
-        for (var i = this.library.length - 1; i > 0; i--) {
+        var library = player.zones['library'].cards;
+        for (var i = library.length - 1; i > 0; i--) {
             var j = Math.floor(Math.random() * (i + 1));
-            var temp = this.library[i];
-            this.library[i] = this.library[j];
-            this.library[j] = temp;
+            var temp = library[i];
+            library[i] = library[j];
+            library[j] = temp;
         }
-    }
+    };
     this.drawCard = function () {
-        if (this.library.length > 0) {
-            this.hand.push(this.library.pop());
+        if (this.player.zones['library'].cards.length > 0) {
+            if (!this.player.zones.hasOwnProperty('hand')) {
+                this.player.zones['hand'] = new Zone('hand');
+            }
+            var drawnCard = this.player.zones['library'].cards.pop();
+            drawnCard.x = 100;
+            drawnCard.y = 100;
+            drawnCard.zone = 'hand';
+            this.player.zones['hand'].cards.push(drawnCard);
+            this.dbUpdateObject(drawnCard);
         }
-    }
+    };
+    this.changeCardZone = function (cardId, sourceZone, targetZone) {
+        if (this.player.zones[sourceZone].cards.length > 0) {
+            if (!this.player.zones.hasOwnProperty(targetZone)) {
+                this.player.zones[targetZone] = new Zone(targetZone);
+            }
+            for (var i = 0; i < this.player.zones[sourceZone].cards.length; i++) {
+                if (this.player.zones[sourceZone].cards[i].id == cardId) {
+                    this.player.zones[targetZone].cards.push(
+                        this.player.zones[sourceZone].cards[i]);
+                    this.player.zones[sourceZone].cards[i].zone = targetZone;
+                    this.dbUpdateObject(this.player.zones[sourceZone].cards[i]);
+                    this.player.zones[sourceZone].cards.splice(i, 1);
+                    break;
+                }
+            }
+        }
+    };
     this.playCard = function (cardId) {
-        for (var i = 0; i < this.hand.length; i++) {
-            if (this.hand[i].ID == cardId) {
-                this.inPlay.push(this.hand[i]);
-                this.hand.splice(i, 1);
+        var hand = this.player.zones['hand'].cards,
+            inPlay = this.player.zones['inPlay'].cards;
+        for (var i = 0; i < hand.length; i++) {
+            if (hand[i].id == cardId) {
+                inPlay.push(hand[i]);
+                hand[i].zone = 'inPlay';
+                this.dbUpdateObject(hand[i]);
+                hand.splice(i, 1);
                 break;
             }
-        };
-    }
+        }
+    };
+    this.getPlayerArray = function () {
+        var playerArray = [];
+        for (var player in this.players) {
+            if (this.players.hasOwnProperty(player)) {
+                playerArray.push(this.players[player]);
+            }
+        }
+        return playerArray;
+    };
 }
 
 function PlayAreaSVG() {
@@ -174,8 +314,10 @@ function PlayAreaSVG() {
         this.x = canvasOffset.left;
         this.y = canvasOffset.top;
         this.tableData = new TableData();
-        this.tableData.room = $('#roomName').val();
-        this.tableData.player = $('#playerName').val();
+        this.tableData.setRoom($('#roomName').val());
+        this.tableData.setPlayer($('#playerName').val());
+
+        this.updateFromServer();
     };
 
     this.drag = d3.behavior.drag();
@@ -224,24 +366,61 @@ function PlayAreaSVG() {
         img.attr('x', d.x)
             .attr('y', d.y);
     });
-    this.drag.on('dragend', function () {
+    this.drag.on('dragend', function (d) {
         var img = d3.select(this);
         if (img.classed('enlarged')) {
             // img.attr('opacity', '1.0');
+            self.tableData.dbUpdateObject(d.originCard.data[0]);
+        } else {
+            self.tableData.dbUpdateObject(d);
         }
-    })
+    });
 
+    this.updateFromServer = function () {
+        if (this.tableData.room !== null) {
+            $.post('tableState.php',
+                    {
+                        action: 'get_state',
+                        room: this.tableData.room,
+                        last_update_id: this.tableData.lastUpdateId
+                    },
+                    function (data) {
+                        if (!data.hasOwnProperty('no_changes')) {
+                            self.tableData.processRoomState(data);
+                            self._drawCards();
+                        }
+                        self.updateFromServer();
+                    },
+                    'json')
+            .fail(function () {
+                // self.updateFromServer();
+            });
+        }
+    };
     this.drawCard = function () {
         this.tableData.drawCard();
         this._drawCards();
     };
     this._drawCards = function () {
-        $('#libraryCount').text(this.tableData.library.length);
-        var hand = d3.select('#hand').selectAll('image')
-            .data(this.tableData.hand,
+        var currentPlayer = this.tableData.player;
+        $('#libraryCount').text(currentPlayer.zones['library'].cards.length);
+        var players = d3.select('#players').selectAll('g')
+            .data(this.tableData.getPlayerArray(),
+                  function (d) { return d.name; });
+        players.enter().append('g');
+        players.exit().remove();
+
+        var zones = players.selectAll('g')
+            .data(function (d) { return d.getZonesAsArray(); },
+                  function (d) { return d.name; });
+        zones.enter().append('g');
+        zones.exit().remove();
+
+        var cards = zones.selectAll('image')
+            .data(function (d) { return d.cards; },
                   function (d) { return d.id; });
 
-        hand.enter().append('image')
+        cards.enter().append('image')
             .attr('xlink:href', function (d) {
                 return d.image_url;
             })
@@ -270,8 +449,8 @@ function PlayAreaSVG() {
                 return d.height;
             })
             .call(this.drag);
-        hand.exit().remove();
-        hand.on('mouseenter', function showEnlargedCard(d) {
+        cards.exit().remove();
+        cards.on('mouseenter', function showEnlargedCard(d) {
             var originCard = d3.select(this),
                 scale = mainApp.playAreaSVG.scale;
             d.originCard = originCard;
@@ -322,7 +501,7 @@ function PlayAreaSVG() {
             }
 
         });
-    }
+    };
     this.resizeSVG = function () {
         // http://stackoverflow.com/a/16265661/225730
         var w = window,
@@ -527,9 +706,9 @@ $(document).ready(function initialSetup() {
         mainApp.playAreaSVG.drawCard();
     });
     $('#setRoom').on('click', function setRoom() {
-        mainApp.playAreaSVG.tableData.room = $('#roomName').val();
+        mainApp.playAreaSVG.tableData.setRoom($('#roomName').val());
     });
     $('#setName').on('click', function setName() {
-        mainApp.playAreaSVG.tableData.player = $('#playerName').val();
+        mainApp.playAreaSVG.tableData.setplayer($('#playerName').val());
     });
 });
