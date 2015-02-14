@@ -31,11 +31,6 @@ function TableData() {
     'use strict';
     var self = this;
     this.deckCSV = null;
-    // this.library = [];
-    // this.hand = [];
-    // this.inPlay = [];
-    // this.outOfPlay = [];
-    // this.counters = [];
     this.room = null;
     this.playerName = null;
     this.player = null;
@@ -220,7 +215,7 @@ function TableData() {
     };
 
     this.shuffleLibrary = function () {
-        var library = player.zones['library'].cards;
+        var library = this.player.zones['library'].cards;
         for (var i = library.length - 1; i > 0; i--) {
             var j = Math.floor(Math.random() * (i + 1));
             var temp = library[i];
