@@ -48,10 +48,26 @@ if ($_POST["action"] === "get_state")
             $checkForUpdateQuery->close();
             break;
         }
+        // handle case of new rooms with no updates
+        elseif ($_POST["last_update_id"] == "-1")
+        {
+            $checkForUpdateQuery->close();
+            $markAsUpdatedQuery->bind_param("s", $_POST["room"]);
+            $markAsUpdatedQuery->execute();
+            $lastUpdateId = $connection->insert_id;
+            $markAsUpdatedQuery->close();
+            $connection->close();
+            echo '{"last_update_id":"$lastUpdateId"}';
+            echo json_encode(array("change_id" => $lastUpdateId,
+                                   "results" => []));
+            return;
+        }
         $totalTimeSlept += 0.2;
         // max wait time
         if ($totalTimeSlept > 5)
         {
+            $checkForUpdateQuery->close();
+            $connection->close();
             echo '{"no_changes":"true"}';
             return;
         }

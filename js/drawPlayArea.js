@@ -39,11 +39,13 @@ function TableData() {
 
     this.setRoom = function (roomName) {
         this.room = roomName;
+        this.lastUpdateId = -1;
     };
     this.setPlayer = function (playerName) {
         this.playerName = playerName;
         if (!this.players.hasOwnProperty(playerName)) {
             this.players[playerName] = new Player(playerName);
+            this.players[playerName].zones['library'] = new Zone('library');
         }
         this.player = this.players[playerName];
     };
@@ -163,7 +165,7 @@ function TableData() {
                 });
             }
         }
-        this.player = this.players[this.playerName];
+        this.setPlayer(this.playerName);
     };
 
     this.loadDeckFromCSV = function (deckCSV) {
@@ -399,10 +401,16 @@ function PlayAreaSVG() {
     this._drawCards = function () {
         var currentPlayer = this.tableData.player;
         $('#libraryCount').text(currentPlayer.zones['library'].cards.length);
+
+        var playerArray = this.tableData.getPlayerArray();
         var players = d3.select('#players').selectAll('g')
-            .data(this.tableData.getPlayerArray(),
+            .data(playerArray,
                   function (d) { return d.name; });
-        players.enter().append('g');
+        players.enter().append('g')
+            .attr('transform', function (d, i) {
+                var rotation = playerArray.length / 360 * i;
+                return 'rotate(' + rotation + ')';
+            });
         players.exit().remove();
 
         var zones = players.selectAll('g')
@@ -704,6 +712,7 @@ $(document).ready(function initialSetup() {
         mainApp.playAreaSVG.tableData.setRoom($('#roomName').val());
     });
     $('#setName').on('click', function setName() {
-        mainApp.playAreaSVG.tableData.setplayer($('#playerName').val());
+        mainApp.playAreaSVG.tableData.setPlayer($('#playerName').val());
+        mainApp.playAreaSVG._drawCards();
     });
 });
