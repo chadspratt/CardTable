@@ -272,18 +272,20 @@ function TableData() {
     };
     this.getPlayerArray = function () {
         var playerArray = [],
-            i = 1;
+            i = 0;
         for (var playerName in this.players) {
             if (this.players.hasOwnProperty(playerName)) {
+                this.players[playerName].order = i;
                 if (this.players[playerName] == this.player) {
-                    this.players[playerName].order = 0;
-                } else {
-                    this.players[playerName].order = i;
-                    i += 1;
+                    var difference = i;
                 }
+                i += 1;
                 playerArray.push(this.players[playerName]);
             }
         }
+        for (i = 0; i < playerArray.length; i++) {
+            playerArray[i].order = (playerArray[i].order - difference) % playerArray.length;
+        };
         return playerArray;
     };
 }
@@ -366,6 +368,7 @@ function PlayAreaSVG() {
             img = d.originCard;
         }
 
+        // XXX this doesn't work correctly when dragging another player's cards
         // move the card
         d.x += d3.event.dx;
         d.y += d3.event.dy;
@@ -419,7 +422,7 @@ function PlayAreaSVG() {
         players
             .attr('transform', function (d) {
                 d.rotation = 360 / playerArray.length * d.order;
-                d.yOffset = -200 - 100 * (playerArray.length);
+                d.yOffset = 200 - 350 * (playerArray.length);
 
                 return 'rotate(' + d.rotation + ' 100 ' + d.yOffset + ')';
             });
@@ -507,14 +510,17 @@ function PlayAreaSVG() {
                     .on('mousemove', function (d) {
                         var svgCoords = self.getSVGCoordinates(d3.event.x,
                                                                d3.event.y);
-                        // XXX need to rotate d.x and y for this to work
-                        // if (svgCoords.x < d.x ||
-                        //     svgCoords.x > d.x + d.width ||
-                        //     svgCoords.y < d.y ||
-                        //     svgCoords.y > d.y + d.height)
-                        // {
-                        //     d3.select(this).remove();
-                        // }
+                        // XXX need to rotate d.x and y for this to work for
+                        // other player's cards
+                        if (self.tableData.playerName === d.playerName) {
+                            if (svgCoords.x < d.x ||
+                                svgCoords.x > d.x + d.width ||
+                                svgCoords.y < d.y ||
+                                svgCoords.y > d.y + d.height)
+                            {
+                                d3.select(this).remove();
+                            }
+                        }
                     })
                     // backup in case the mouse doesn't get caught in the
                     // mousemove removal zone
@@ -523,6 +529,10 @@ function PlayAreaSVG() {
                     })
                 mainApp.enlargedCard.call(self.drag);
                 newCardData.exit().remove();
+
+                if (this.tableData.playerName === d.playerName) {
+                    var buttons = d3.select('#cardButtons').selectAll('g.button');
+                }
             }
 
         });

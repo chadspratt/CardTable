@@ -21,6 +21,7 @@
   <g id="players"></g>
   <g id="counters"></g>
   <g id="enlargedCard"></g>
+  <g id="cardButtons"></g>
 </svg>
 
 <div id="viewControls" class="overlayItem">
