@@ -42,12 +42,12 @@
       <button id="loadDeck">Load</button>
     </div>
 
-    <div id="loadDeckHeader" class="links"><right>Load Deck</right></div>
+    <div id="loadDeckHeader" class="links"><right>Load From CSV</right></div>
   </div>
 
   <div id="roomNameBox">
     <h4>room name</h4>
-    <input id="roomName" type="text" value="defaultRoom">
+    <input id="roomName" type="text" value="Room">
     <button id="setRoom">Join</button>
   </div>
 

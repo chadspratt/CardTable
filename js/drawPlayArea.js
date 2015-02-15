@@ -86,7 +86,7 @@ function TableData() {
                     {
                         action: 'update',
                         room: this.room,
-                        player: this.playerName,
+                        player: object.playerName,
                         zone: object.zone,
                         type: object.type,
                         id: object.id,
@@ -100,14 +100,14 @@ function TableData() {
                     'json');
         }
     };
-    this._dbRemoveObject = function (objectType, object, zone) {
+    this._dbRemoveObject = function (object) {
         if (this.room !== null && this.player !== null) {
             $.post('tableState.php',
                     {
                         action: 'remove',
                         room: this.room,
-                        player: this.playerName,
-                        type: objectType,
+                        player: object.playerName,
+                        type: object.type,
                         id: object.id
                     },
                     function (data) {
@@ -154,6 +154,7 @@ function TableData() {
                     image_url: object.imageUrl,
                     x: object.xPos,
                     y: object.yPos,
+                    playerName: object.player
                 });
             } else if (object.type === 'counter') {
                 player.counters.push({
@@ -162,6 +163,7 @@ function TableData() {
                     image_url: object.imageUrl,
                     x: object.xPos,
                     y: object.yPos,
+                    playerName: object.player
                 });
             }
         }
@@ -269,10 +271,17 @@ function TableData() {
         }
     };
     this.getPlayerArray = function () {
-        var playerArray = [];
-        for (var player in this.players) {
-            if (this.players.hasOwnProperty(player)) {
-                playerArray.push(this.players[player]);
+        var playerArray = [],
+            i = 1;
+        for (var playerName in this.players) {
+            if (this.players.hasOwnProperty(playerName)) {
+                if (this.players[playerName] == this.player) {
+                    this.players[playerName].order = 0;
+                } else {
+                    this.players[playerName].order = i;
+                    i += 1;
+                }
+                playerArray.push(this.players[playerName]);
             }
         }
         return playerArray;
@@ -367,7 +376,7 @@ function PlayAreaSVG() {
         var img = d3.select(this);
         if (img.classed('enlarged')) {
             // img.attr('opacity', '1.0');
-            self.tableData.dbUpdateObject(d.originCard.data[0]);
+            self.tableData.dbUpdateObject(d.originCard.data()[0]);
         } else {
             self.tableData.dbUpdateObject(d);
         }
@@ -406,10 +415,13 @@ function PlayAreaSVG() {
         var players = d3.select('#players').selectAll('g')
             .data(playerArray,
                   function (d) { return d.name; });
-        players.enter().append('g')
-            .attr('transform', function (d, i) {
-                var rotation = playerArray.length / 360 * i;
-                return 'rotate(' + rotation + ')';
+        players.enter().append('g');
+        players
+            .attr('transform', function (d) {
+                d.rotation = 360 / playerArray.length * d.order;
+                d.yOffset = -200 - 100 * (playerArray.length);
+
+                return 'rotate(' + d.rotation + ' 100 ' + d.yOffset + ')';
             });
         players.exit().remove();
 
@@ -453,17 +465,26 @@ function PlayAreaSVG() {
             })
             .call(this.drag);
         cards.exit().remove();
-        cards.on('mouseenter', function showEnlargedCard(d) {
+        cards.on('mousemove', function showEnlargedCard(d) {
             var originCard = d3.select(this),
                 scale = mainApp.playAreaSVG.scale;
             d.originCard = originCard;
 
             if (scale < 0.8) {
                 var newCardData = d3.select('#enlargedCard').selectAll('image')
-                    .data([d], function (d) {return d.image_url; });
+                        .data([d], function (d) {return d.image_url; }),
+                    player = d3.select(d.originCard[0][0].parentNode.parentNode);
                 mainApp.enlargedCard = newCardData.enter().append('image');
                 mainApp.enlargedCard
                     .classed('enlarged', true)
+                    .attr('transform', function (d) {
+                        var imgCenterX = d.x + d.width / 2,
+                            imgCenterY = d.y + d.height / 2,
+                            playerData = player.datum();
+                            // var rotation = 360 / playerArray.length * d.order,
+                        return player.attr('transform') + ' rotate(-' + playerData.rotation +
+                               ' ' + imgCenterX + ' ' + imgCenterY + ')';
+                    })
                     .attr('xlink:href', function (d) {
                         return d.image_url;
                     })
@@ -486,13 +507,14 @@ function PlayAreaSVG() {
                     .on('mousemove', function (d) {
                         var svgCoords = self.getSVGCoordinates(d3.event.x,
                                                                d3.event.y);
-                        if (svgCoords.x < d.x ||
-                            svgCoords.x > d.x + d.width ||
-                            svgCoords.y < d.y ||
-                            svgCoords.y > d.y + d.height)
-                        {
-                            d3.select(this).remove();
-                        }
+                        // XXX need to rotate d.x and y for this to work
+                        // if (svgCoords.x < d.x ||
+                        //     svgCoords.x > d.x + d.width ||
+                        //     svgCoords.y < d.y ||
+                        //     svgCoords.y > d.y + d.height)
+                        // {
+                        //     d3.select(this).remove();
+                        // }
                     })
                     // backup in case the mouse doesn't get caught in the
                     // mousemove removal zone
@@ -711,7 +733,7 @@ $(document).ready(function initialSetup() {
     $('#setRoom').on('click', function setRoom() {
         mainApp.playAreaSVG.tableData.setRoom($('#roomName').val());
     });
-    $('#setName').on('click', function setName() {
+    $('#setName').on('click', function setPlayer() {
         mainApp.playAreaSVG.tableData.setPlayer($('#playerName').val());
         mainApp.playAreaSVG._drawCards();
     });
