@@ -4,16 +4,21 @@ require_once "../../db_connect/cards.inc";
 
 $connection = GetDatabaseConnection();
 $getStateQuery = $connection->prepare("SELECT player, zone, type, id, imageUrl,
-                                      xPos, yPos, rotation FROM CurrentState
+                                      xPos, yPos, rotation, ordering FROM CurrentState
                                       WHERE room = ?");
 $addQuery = $connection->prepare("INSERT INTO CurrentState
                                  (room, player, zone, type, id,
                                  imageUrl, xPos, yPos)
                                  SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?");
 $updateQuery = $connection->prepare("UPDATE CurrentState SET
-                                    zone = ?, xPos = ?, yPos = ?, rotation = ?
+                                    zone = ?, xPos = ?, yPos = ?, rotation = ?,
+                                    ordering = ?
                                     WHERE room = ? AND player = ? AND
                                     type = ? AND id = ?");
+$updateLibraryOrderQuery = $connection->prepare("UPDATE CurrentState SET
+                                    ordering = ?
+                                    WHERE room = ? AND player = ? AND
+                                    id = ? AND zone = 'library'");
 $removeQuery = $connection->prepare("DELETE FROM CurrentState
                                     WHERE room = ? AND player = ? AND
                                     type = ? AND id = ?");
@@ -76,8 +81,8 @@ if ($_POST["action"] === "get_state")
 
     $getStateQuery->bind_param("s", $_POST["room"]);
     $getStateQuery->execute();
-    $getStateQuery->bind_result($player, $zone, $type, $id,
-                                $imageUrl, $xPos, $yPos, $rotation);
+    $getStateQuery->bind_result($player, $zone, $type, $id, $imageUrl,
+                                $xPos, $yPos, $rotation, $ordering);
     $results = [];
     while ($getStateQuery->fetch())
     {
@@ -89,7 +94,8 @@ if ($_POST["action"] === "get_state")
             "imageUrl" => $imageUrl,
             "xPos" => $xPos,
             "yPos" => $yPos,
-            "rotation" => $rotation
+            "rotation" => $rotation,
+            "ordering" => $ordering
         ];
         array_push($results, $row);
     }
@@ -117,17 +123,31 @@ else
     }
     elseif ($_POST["action"] === "update")
     {
-        $updateQuery->bind_param("siiisssi",
+        $updateQuery->bind_param("siiiisssi",
                                  $_POST["zone"],
                                  $_POST["x_pos"],
                                  $_POST["y_pos"],
                                  $_POST["rotation"],
+                                 $_POST["ordering"],
                                  $_POST["room"],
                                  $_POST["player"],
                                  $_POST["type"],
                                  $_POST["id"]);
         $updateQuery->execute();
         $updateQuery->close();
+    }
+    elseif ($_POST["action"] === "update_library_order")
+    {
+        for ($i=0; $i < count($_POST["id"]); $i++)
+        {
+            $updateLibraryOrderQuery->bind_param("issi",
+                                  $_POST["ordering"][$i],
+                                  $_POST["room"],
+                                  $_POST["player"],
+                                  $_POST["id"][$i]);
+            $updateLibraryOrderQuery->execute();
+        }
+        $updateLibraryOrderQuery->close();
     }
     elseif ($_POST["action"] === "remove")
     {
@@ -151,7 +171,7 @@ else
     $markAsUpdatedQuery->bind_param("s", $_POST["room"]);
     $markAsUpdatedQuery->execute();
     $lastUpdateId = $connection->insert_id;
-    echo '{"last_update_id":"{$lastUpdateId}"}';
+    echo "{\"last_update_id\":\"{$lastUpdateId}\"}";
 }
 
 $connection->close();

@@ -93,7 +93,31 @@ function TableData() {
                         image_url: object.image_url,
                         x_pos: object.x,
                         y_pos: object.y,
-                        rotation: object.rotation
+                        rotation: object.rotation,
+                        ordering: object.ordering
+                    },
+                    function (data) {
+                        self.lastUpdateId = data.last_update_id;
+                    },
+                    'json');
+        }
+    };
+    this.dbUpdateLibraryOrdering = function () {
+        if (this.room !== null && this.player !== null) {
+            var library = this.player.zones['library'].cards,
+                objectIds = [],
+                orderings = [];
+            for (var i = 0; i < library.length; i++) {
+                objectIds.push(library[i].id);
+                orderings.push(library[i].ordering);
+            }
+            $.post('tableState.php',
+                    {
+                        action: 'update_library_order',
+                        room: this.room,
+                        player: this.playerName,
+                        'id[]': objectIds,
+                        'ordering[]': orderings
                     },
                     function (data) {
                         self.lastUpdateId = data.last_update_id;
@@ -156,7 +180,8 @@ function TableData() {
                     x: object.xPos,
                     y: object.yPos,
                     playerName: object.player,
-                    rotation: object.rotation
+                    rotation: object.rotation,
+                    ordering: object.ordering
                 });
             } else if (object.type === 'counter') {
                 player.counters.push({
@@ -167,6 +192,18 @@ function TableData() {
                     y: object.yPos,
                     playerName: object.player
                 });
+            }
+        }
+        for (var playerName in this.players) {
+            if (this.players.hasOwnProperty(playerName)) {
+                for (var zoneName in this.players[playerName].zones) {
+                    if (this.players[playerName].zones.hasOwnProperty(zoneName)) {
+                        this.players[playerName].zones[zoneName].cards.sort(
+                            function (a, b) {
+                                return  a.ordering - b.ordering;
+                            });
+                    }
+                }
             }
         }
         this.setPlayer(this.playerName);
@@ -230,18 +267,16 @@ function TableData() {
             library[i] = library[j];
             library[j] = temp;
         }
+        for (var i = library.length - 1; i > 0; i--) {
+            library[i].ordering = i;
+        }
+        this.dbUpdateLibraryOrdering();
     };
     this.drawCard = function () {
-        if (this.player.zones['library'].cards.length > 0) {
-            if (!this.player.zones.hasOwnProperty('hand')) {
-                this.player.zones['hand'] = new Zone('hand');
-            }
-            var drawnCard = this.player.zones['library'].cards.pop();
-            drawnCard.x = 100;
-            drawnCard.y = 100;
-            drawnCard.zone = 'hand';
-            this.player.zones['hand'].cards.push(drawnCard);
-            this.dbUpdateObject(drawnCard);
+        var library = this.player.zones['library'].cards;
+        if (library.length > 0) {
+            this.changeCardZone(library[library.length - 1],
+                                'hand');
         }
     };
     this.changeCardZone = function (card, targetZone, end) {
@@ -259,16 +294,27 @@ function TableData() {
             if (!this.player.zones.hasOwnProperty(targetZone)) {
                 this.player.zones[targetZone] = new Zone(targetZone);
             }
+            var targetCards = this.player.zones[targetZone].cards,
+                newOrdering = 0;
             if (targetZone === 'library' &&
                 end === 'bottom') {
-                this.player.zones[targetZone].cards.unshift(card);
+                for (i = 0; i < targetCards.length; i++) {
+                    if (targetCards[i].ordering <= newOrdering) {
+                        newOrdering = targetCards[i].ordering - 1;
+                    }
+                }
             } else {
-                this.player.zones[targetZone].cards.push(card);
-
+                for (i = 0; i < targetCards.length; i++) {
+                    if (targetCards[i].ordering >= newOrdering) {
+                        newOrdering = targetCards[i].ordering + 1;
+                    }
+                }
             }
 
+            targetCards.push(card);
             // update server
             card.zone = targetZone;
+            card.ordering = newOrdering;
             this.dbUpdateObject(card);
         }
     };
@@ -352,16 +398,20 @@ function PlayAreaSVG() {
             parent = d3.select($(d.originCard[0]).parent()[0]);
         }
         // put the card on top of other cards in its group
-        parent.selectAll('image')
-            .sort(function(a, b) {
-                if (a.id === d.id)   {
-                    return 1;
-                } else if (b.id === d.id) {
-                    return -1;
-                } else {
-                    return 0;
-                }
-            });
+        var newOrdering = 0,
+            siblings = parent.selectAll('image');
+            siblings.each(function (d) {
+            if (d.ordering >= newOrdering) {
+                newOrdering = d.ordering + 1;
+            }
+        });
+
+        d.ordering = newOrdering;
+        self.tableData.dbUpdateObject(d);
+
+        siblings.sort(function(a, b) {
+            return a.ordering - b.ordering;
+        });
     });
     this.drag.on('drag', function (d) {
         var img = d3.select(this),
@@ -425,6 +475,8 @@ function PlayAreaSVG() {
         this._drawCards();
     };
     this._drawCards = function () {
+        d3.select('#cardButtons').selectAll("*").remove();
+
         var currentPlayer = this.tableData.player;
         $('#libraryCount').text(currentPlayer.zones['library'].cards.length);
 
@@ -482,6 +534,9 @@ function PlayAreaSVG() {
             })
             .call(this.drag);
         cards.exit().remove();
+        cards.sort(function (a, b) {
+            return a.ordering - b.ordering;
+        });
         cards.on('mousemove', function showEnlargedCard(d) {
             var originCard = d3.select(this),
                 scale = mainApp.playAreaSVG.scale;
@@ -546,145 +601,148 @@ function PlayAreaSVG() {
                 newCardData.exit().remove();
 
                 mainApp.enlargedCard.on('click', function showCardButtons(d) {
-                    d.clicked = true;
+                    if(!d.clicked ||
+                       self.tableData.playerName !== d.playerName)
+                    {
+                        return;
+                    }
                     // show buttons for own cards
                     var card = d;
-                    if (self.tableData.playerName === d.playerName) {
-                        // x/y/width/height are percentages of enlarged card width
-                        var buttonData = {
-                            rotateLeft: {
-                                text: 'L',
-                                x: 10,
-                                y: 20,
-                                width: 10,
-                                height: 10
-                            },
-                            rotateRight: {
-                                text: 'R',
-                                x: 80,
-                                y: 20,
-                                width: 10,
-                                height: 10
-                            },
-                            play: {
-                                text: 'Play',
-                                x: 30,
-                                y: 20,
-                                width: 40,
-                                height: 10
-                            },
-                            hand: {
-                                text: 'Hand',
-                                x: 30,
-                                y: 20,
-                                width: 40,
-                                height: 10
-                            },
-                            libraryBottom: {
-                                text: 'B',
-                                x: 10,
-                                y: 35,
-                                width: 10,
-                                height: 10
-                            },
-                            library: {
-                                text: 'Library',
-                                x: 30,
-                                y: 35,
-                                width: 40,
-                                height: 10
-                            },
-                            libraryTop: {
-                                text: 'T',
-                                x: 80,
-                                y: 35,
-                                width: 10,
-                                height: 10
-                            }
+                    // x/y/width/height are percentages of enlarged card width
+                    var buttonData = {
+                        rotateLeft: {
+                            text: 'L',
+                            x: 10,
+                            y: 20,
+                            width: 10,
+                            height: 10
                         },
-                            buttons = [];
-
-                        if (d.zone === 'hand') {
-                            buttons = [
-                                buttonData.play,
-                                buttonData.libraryTop,
-                                buttonData.library,
-                                buttonData.libraryBottom
-                            ]
-                        } else if (d.zone === 'inPlay') {
-                            buttons = [
-                                buttonData.rotateLeft,
-                                buttonData.hand,
-                                buttonData.rotateRight,
-                                buttonData.libraryTop,
-                                buttonData.library,
-                                buttonData.libraryBottom
-                            ]
+                        rotateRight: {
+                            text: 'R',
+                            x: 80,
+                            y: 20,
+                            width: 10,
+                            height: 10
+                        },
+                        play: {
+                            text: 'Play',
+                            x: 30,
+                            y: 20,
+                            width: 40,
+                            height: 10
+                        },
+                        hand: {
+                            text: 'Hand',
+                            x: 30,
+                            y: 20,
+                            width: 40,
+                            height: 10
+                        },
+                        libraryBottom: {
+                            text: 'B',
+                            x: 10,
+                            y: 35,
+                            width: 10,
+                            height: 10
+                        },
+                        library: {
+                            text: 'Library',
+                            x: 30,
+                            y: 35,
+                            width: 40,
+                            height: 10
+                        },
+                        libraryTop: {
+                            text: 'T',
+                            x: 80,
+                            y: 35,
+                            width: 10,
+                            height: 10
                         }
+                    },
+                        buttons = [];
 
-                        d3.select('#cardButtons').selectAll("*").remove();
-
-                        var cardButtons = d3.select('#cardButtons').selectAll('g')
-                            .data(buttons, function (d) { return d.text });
-                        cardButtons.enter().append('g')
-                            .classed('button', true)
-                            .on('click', function (d) {
-                                if (d.text === 'L') {
-                                    self.tableData.rotateLeft(card);
-                                    self._drawCards();
-                                } else if (d.text === 'R') {
-                                    self.tableData.rotateRight(card);
-                                    self._drawCards();
-                                } else if (d.text === 'T') {
-                                    self.tableData.changeCardZone(card,
-                                                                  'library',
-                                                                  'top');
-                                    self._drawCards();
-                                } else if (d.text === 'B') {
-                                    self.tableData.changeCardZone(card,
-                                                                  'library',
-                                                                  'bottom');
-                                    self._drawCards();
-                                } else if (d.text === 'Play') {
-                                    self.tableData.changeCardZone(card,
-                                                                  'inPlay');
-                                    self._drawCards();
-                                } else if (d.text === 'Hand') {
-                                    self.tableData.changeCardZone(card,
-                                                                  'hand');
-                                    self._drawCards();
-                                }
-                            });
-                        cardButtons.append('rect')
-                            .attr('x', function (d) {
-                                return card.enlargedX + card.enlargedWidth / 100 * d.x;
-                            })
-                            .attr('y', function (d) {
-                                return card.enlargedY + card.enlargedWidth / 100 * d.y;
-                            })
-                            .attr('width', function (d) {
-                                return card.enlargedWidth / 100 * d.width;
-                            })
-                            .attr('height', function (d) {
-                                return card.enlargedWidth / 100 * d.height;
-                            })
-                            .attr('rx', 5)
-                            .attr('ry', 5);
-                        cardButtons.append('text')
-                            .html(function (d) {
-                                return d.text;
-                            })
-                            .style('font-size', function (d) {
-                                var size = 1 / scale
-                                return size + 'em';
-                            })
-                            .attr('x', function (d) {
-                                return card.enlargedX + card.enlargedWidth / 100 * (d.x + 2);
-                            })
-                            .attr('y', function (d) {
-                                return card.enlargedY + card.enlargedWidth / 100 * (d.y + 7);
-                            });
+                    if (d.zone === 'hand') {
+                        buttons = [
+                            buttonData.play,
+                            buttonData.libraryTop,
+                            buttonData.library,
+                            buttonData.libraryBottom
+                        ]
+                    } else if (d.zone === 'inPlay') {
+                        buttons = [
+                            buttonData.rotateLeft,
+                            buttonData.hand,
+                            buttonData.rotateRight,
+                            buttonData.libraryTop,
+                            buttonData.library,
+                            buttonData.libraryBottom
+                        ]
                     }
+
+                    d3.select('#cardButtons').selectAll("*").remove();
+
+                    var cardButtons = d3.select('#cardButtons').selectAll('g')
+                        .data(buttons, function (d) { return d.text });
+                    cardButtons.enter().append('g')
+                        .classed('button', true)
+                        .on('click', function (d) {
+                            if (d.text === 'L') {
+                                self.tableData.rotateLeft(card);
+                                self._drawCards();
+                            } else if (d.text === 'R') {
+                                self.tableData.rotateRight(card);
+                                self._drawCards();
+                            } else if (d.text === 'T') {
+                                self.tableData.changeCardZone(card,
+                                                              'library',
+                                                              'top');
+                                self._drawCards();
+                            } else if (d.text === 'B') {
+                                self.tableData.changeCardZone(card,
+                                                              'library',
+                                                              'bottom');
+                                self._drawCards();
+                            } else if (d.text === 'Play') {
+                                self.tableData.changeCardZone(card,
+                                                              'inPlay');
+                                self._drawCards();
+                            } else if (d.text === 'Hand') {
+                                self.tableData.changeCardZone(card,
+                                                              'hand');
+                                self._drawCards();
+                            }
+                            d3.select('#cardButtons').selectAll("*").remove();
+                        });
+                    cardButtons.append('rect')
+                        .attr('x', function (d) {
+                            return card.enlargedX + card.enlargedWidth / 100 * d.x;
+                        })
+                        .attr('y', function (d) {
+                            return card.enlargedY + card.enlargedWidth / 100 * d.y;
+                        })
+                        .attr('width', function (d) {
+                            return card.enlargedWidth / 100 * d.width;
+                        })
+                        .attr('height', function (d) {
+                            return card.enlargedWidth / 100 * d.height;
+                        })
+                        .attr('rx', 5)
+                        .attr('ry', 5);
+                    cardButtons.append('text')
+                        .html(function (d) {
+                            return d.text;
+                        })
+                        .style('font-size', function (d) {
+                            var size = 1 / scale
+                            return size + 'em';
+                        })
+                        .attr('x', function (d) {
+                            return card.enlargedX + card.enlargedWidth / 100 * (d.x + 2);
+                        })
+                        .attr('y', function (d) {
+                            return card.enlargedY + card.enlargedWidth / 100 * (d.y + 7);
+                        });
                 });
             }
         });
