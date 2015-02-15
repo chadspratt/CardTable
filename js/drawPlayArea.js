@@ -422,7 +422,7 @@ function PlayAreaSVG() {
         players
             .attr('transform', function (d) {
                 d.rotation = 360 / playerArray.length * d.order;
-                d.yOffset = 200 - 350 * (playerArray.length);
+                d.yOffset = -300 * (playerArray.length);
 
                 return 'rotate(' + d.rotation + ' 100 ' + d.yOffset + ')';
             });
@@ -483,9 +483,10 @@ function PlayAreaSVG() {
                     .attr('transform', function (d) {
                         var imgCenterX = d.x + d.width / 2,
                             imgCenterY = d.y + d.height / 2,
-                            playerData = player.datum();
+                            playerData = player.datum(),
+                            rotation = playerData.rotation * -1;
                             // var rotation = 360 / playerArray.length * d.order,
-                        return player.attr('transform') + ' rotate(-' + playerData.rotation +
+                        return player.attr('transform') + ' rotate(' + rotation +
                                ' ' + imgCenterX + ' ' + imgCenterY + ')';
                     })
                     .attr('xlink:href', function (d) {
@@ -530,8 +531,9 @@ function PlayAreaSVG() {
                 mainApp.enlargedCard.call(self.drag);
                 newCardData.exit().remove();
 
-                if (this.tableData.playerName === d.playerName) {
-                    var buttons = d3.select('#cardButtons').selectAll('g.button');
+                // show buttons for own cards
+                if (self.tableData.playerName === d.playerName) {
+                    var buttons = d3.select('#cardButtons');
                 }
             }
 
