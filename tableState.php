@@ -3,15 +3,15 @@
 require_once "../../db_connect/cards.inc";
 
 $connection = GetDatabaseConnection();
-$getStateQuery = $connection->prepare("SELECT player, zone, type, id,
-                                      imageUrl, xPos, yPos FROM CurrentState
+$getStateQuery = $connection->prepare("SELECT player, zone, type, id, imageUrl,
+                                      xPos, yPos, rotation FROM CurrentState
                                       WHERE room = ?");
 $addQuery = $connection->prepare("INSERT INTO CurrentState
                                  (room, player, zone, type, id,
                                  imageUrl, xPos, yPos)
-                                 SELECT ?, ?, ?, ?, ?, ?, ?, ?");
+                                 SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?");
 $updateQuery = $connection->prepare("UPDATE CurrentState SET
-                                    zone = ?, xPos = ?, yPos = ?
+                                    zone = ?, xPos = ?, yPos = ?, rotation = ?
                                     WHERE room = ? AND player = ? AND
                                     type = ? AND id = ?");
 $removeQuery = $connection->prepare("DELETE FROM CurrentState
@@ -77,7 +77,7 @@ if ($_POST["action"] === "get_state")
     $getStateQuery->bind_param("s", $_POST["room"]);
     $getStateQuery->execute();
     $getStateQuery->bind_result($player, $zone, $type, $id,
-                                $imageUrl, $xPos, $yPos);
+                                $imageUrl, $xPos, $yPos, $rotation);
     $results = [];
     while ($getStateQuery->fetch())
     {
@@ -88,7 +88,8 @@ if ($_POST["action"] === "get_state")
             "id" => $id,
             "imageUrl" => $imageUrl,
             "xPos" => $xPos,
-            "yPos" => $yPos
+            "yPos" => $yPos,
+            "rotation" => $rotation
         ];
         array_push($results, $row);
     }
@@ -116,10 +117,11 @@ else
     }
     elseif ($_POST["action"] === "update")
     {
-        $updateQuery->bind_param("siisssi",
+        $updateQuery->bind_param("siiisssi",
                                  $_POST["zone"],
                                  $_POST["x_pos"],
                                  $_POST["y_pos"],
+                                 $_POST["rotation"],
                                  $_POST["room"],
                                  $_POST["player"],
                                  $_POST["type"],
@@ -149,7 +151,7 @@ else
     $markAsUpdatedQuery->bind_param("s", $_POST["room"]);
     $markAsUpdatedQuery->execute();
     $lastUpdateId = $connection->insert_id;
-    echo '{"last_update_id":"$lastUpdateId"}';
+    echo '{"last_update_id":"{$lastUpdateId}"}';
 }
 
 $connection->close();

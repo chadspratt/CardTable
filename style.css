@@ -6,8 +6,6 @@ body {
     top: 0px;
     left: 0px;
     border: 1px solid #d3d3d3;
-    /*width: 99%;*/
-    /*height: 99%;*/
     /*on bottom*/
     z-index: 0;
 }
@@ -54,4 +52,7 @@ body {
 }
 .inline {
     display: inline-block;
+}
+.button rect {
+    fill: rgb(106, 164, 223);
 }

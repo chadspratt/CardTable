@@ -37,23 +37,14 @@
 <div id="coordDisplay" class="overlayItem">x: z:</div>
 
 <div id="gameControls">
-  <div id="loadDeckBox" class="overlayItem inline">
-    <div id="loadDeckForm">
-      <textarea type="text" id="deckCSV" value="" rows="10" cols="50"></textarea>
-      <button id="loadDeck">Load</button>
-    </div>
-
-    <div id="loadDeckHeader" class="links"><right>Load From CSV</right></div>
-  </div>
-
   <div id="roomNameBox">
-    <h4>room name</h4>
+    <h4>Room Name:</h4>
     <input id="roomName" type="text" value="Room">
     <button id="setRoom">Join</button>
   </div>
 
   <div id="playerNameBox">
-    <h4>player name</h4>
+    <h4>Player Name:</h4>
     <input id="playerName" type="text" value="defaultPlayer">
     <button id="setName">Set</button>
   </div>
@@ -62,6 +53,13 @@
     <H2>Library (<span id="libraryCount">0</span> cards)</H2>
     <button id="drawCard">Draw</button>
     <button id="shuffleLibrary">Shuffle</button>
+    <div id="loadDeckBox" class="overlayItem inline">
+      <div id="loadDeckForm">
+        <textarea type="text" id="deckCSV" value="" rows="10" cols="50"></textarea>
+        <button id="loadDeck">Load</button>
+      </div>
+      <div id="loadDeckHeader" class="links">Load From CSV</div>
+    </div>
   </div>
 </div>
 

@@ -92,7 +92,8 @@ function TableData() {
                         id: object.id,
                         image_url: object.image_url,
                         x_pos: object.x,
-                        y_pos: object.y
+                        y_pos: object.y,
+                        rotation: object.rotation
                     },
                     function (data) {
                         self.lastUpdateId = data.last_update_id;
@@ -154,7 +155,8 @@ function TableData() {
                     image_url: object.imageUrl,
                     x: object.xPos,
                     y: object.yPos,
-                    playerName: object.player
+                    playerName: object.player,
+                    rotation: object.rotation
                 });
             } else if (object.type === 'counter') {
                 player.counters.push({
@@ -185,6 +187,7 @@ function TableData() {
             card.id = i;
             card.zone = 'library';
             card.type = 'card';
+            card.rotation = 0;
 
             // create extra copies of duplicate cards
             for (var j = 1; j < card.count; j++) {
@@ -194,7 +197,8 @@ function TableData() {
                     count: card.count,
                     id: library.length + duplicateCards.length,
                     zone: 'library',
-                    type: 'card'
+                    type: 'card',
+                    rotation: 0
                 });
             }
         }
@@ -240,35 +244,41 @@ function TableData() {
             this.dbUpdateObject(drawnCard);
         }
     };
-    this.changeCardZone = function (cardId, sourceZone, targetZone) {
-        if (this.player.zones[sourceZone].cards.length > 0) {
-            if (!this.player.zones.hasOwnProperty(targetZone)) {
-                this.player.zones[targetZone] = new Zone(targetZone);
-            }
-            for (var i = 0; i < this.player.zones[sourceZone].cards.length; i++) {
-                if (this.player.zones[sourceZone].cards[i].id == cardId) {
-                    this.player.zones[targetZone].cards.push(
-                        this.player.zones[sourceZone].cards[i]);
-                    this.player.zones[sourceZone].cards[i].zone = targetZone;
-                    this.dbUpdateObject(this.player.zones[sourceZone].cards[i]);
-                    this.player.zones[sourceZone].cards.splice(i, 1);
+    this.changeCardZone = function (card, targetZone, end) {
+        if (this.player.zones[card.zone].cards.length > 0) {
+            // remove from old zone
+            var sourceCards = this.player.zones[card.zone].cards;
+            for (var i = 0; i < sourceCards.length; i++) {
+                if (sourceCards[i].id == card.id) {
+                    sourceCards.splice(i, 1);
                     break;
                 }
             }
+
+            // add to new zone
+            if (!this.player.zones.hasOwnProperty(targetZone)) {
+                this.player.zones[targetZone] = new Zone(targetZone);
+            }
+            if (targetZone === 'library' &&
+                end === 'bottom') {
+                this.player.zones[targetZone].cards.unshift(card);
+            } else {
+                this.player.zones[targetZone].cards.push(card);
+
+            }
+
+            // update server
+            card.zone = targetZone;
+            this.dbUpdateObject(card);
         }
     };
-    this.playCard = function (cardId) {
-        var hand = this.player.zones['hand'].cards,
-            inPlay = this.player.zones['inPlay'].cards;
-        for (var i = 0; i < hand.length; i++) {
-            if (hand[i].id == cardId) {
-                inPlay.push(hand[i]);
-                hand[i].zone = 'inPlay';
-                this.dbUpdateObject(hand[i]);
-                hand.splice(i, 1);
-                break;
-            }
-        }
+    this.rotateLeft = function (card) {
+        card.rotation = (card.rotation - 90) % 360;
+        this.dbUpdateObject(card);
+    };
+    this.rotateRight = function (card) {
+        card.rotation = (card.rotation + 90) % 360;
+        this.dbUpdateObject(card);
     };
     this.getPlayerArray = function () {
         var playerArray = [],
@@ -336,6 +346,7 @@ function PlayAreaSVG() {
         var img = d3.select(this),
             parent = d3.select($(this).parent()[0]);
         if (img.classed('enlarged')) {
+            d.clicked = true;
             img.attr('opacity', '0.0');
             img = d.originCard;
             parent = d3.select($(d.originCard[0]).parent()[0]);
@@ -357,6 +368,7 @@ function PlayAreaSVG() {
             parent = d3.select($(this).parent()[0]);
         // parent.append(img[0]);
         if (img.classed('enlarged')) {
+            d.clicked = false;
             // move the enlarged card
             d.enlargedX += d3.event.dx;
             d.enlargedY += d3.event.dy;
@@ -379,7 +391,9 @@ function PlayAreaSVG() {
         var img = d3.select(this);
         if (img.classed('enlarged')) {
             // img.attr('opacity', '1.0');
-            self.tableData.dbUpdateObject(d.originCard.data()[0]);
+            if (!d.clicked) {
+                self.tableData.dbUpdateObject(d.originCard.data()[0]);
+            }
         } else {
             self.tableData.dbUpdateObject(d);
         }
@@ -531,12 +545,148 @@ function PlayAreaSVG() {
                 mainApp.enlargedCard.call(self.drag);
                 newCardData.exit().remove();
 
-                // show buttons for own cards
-                if (self.tableData.playerName === d.playerName) {
-                    var buttons = d3.select('#cardButtons');
-                }
-            }
+                mainApp.enlargedCard.on('click', function showCardButtons(d) {
+                    d.clicked = true;
+                    // show buttons for own cards
+                    var card = d;
+                    if (self.tableData.playerName === d.playerName) {
+                        // x/y/width/height are percentages of enlarged card width
+                        var buttonData = {
+                            rotateLeft: {
+                                text: 'L',
+                                x: 10,
+                                y: 20,
+                                width: 10,
+                                height: 10
+                            },
+                            rotateRight: {
+                                text: 'R',
+                                x: 80,
+                                y: 20,
+                                width: 10,
+                                height: 10
+                            },
+                            play: {
+                                text: 'Play',
+                                x: 30,
+                                y: 20,
+                                width: 40,
+                                height: 10
+                            },
+                            hand: {
+                                text: 'Hand',
+                                x: 30,
+                                y: 20,
+                                width: 40,
+                                height: 10
+                            },
+                            libraryBottom: {
+                                text: 'B',
+                                x: 10,
+                                y: 35,
+                                width: 10,
+                                height: 10
+                            },
+                            library: {
+                                text: 'Library',
+                                x: 30,
+                                y: 35,
+                                width: 40,
+                                height: 10
+                            },
+                            libraryTop: {
+                                text: 'T',
+                                x: 80,
+                                y: 35,
+                                width: 10,
+                                height: 10
+                            }
+                        },
+                            buttons = [];
 
+                        if (d.zone === 'hand') {
+                            buttons = [
+                                buttonData.play,
+                                buttonData.libraryTop,
+                                buttonData.library,
+                                buttonData.libraryBottom
+                            ]
+                        } else if (d.zone === 'inPlay') {
+                            buttons = [
+                                buttonData.rotateLeft,
+                                buttonData.hand,
+                                buttonData.rotateRight,
+                                buttonData.libraryTop,
+                                buttonData.library,
+                                buttonData.libraryBottom
+                            ]
+                        }
+
+                        d3.select('#cardButtons').selectAll("*").remove();
+
+                        var cardButtons = d3.select('#cardButtons').selectAll('g')
+                            .data(buttons, function (d) { return d.text });
+                        cardButtons.enter().append('g')
+                            .classed('button', true)
+                            .on('click', function (d) {
+                                if (d.text === 'L') {
+                                    self.tableData.rotateLeft(card);
+                                    self._drawCards();
+                                } else if (d.text === 'R') {
+                                    self.tableData.rotateRight(card);
+                                    self._drawCards();
+                                } else if (d.text === 'T') {
+                                    self.tableData.changeCardZone(card,
+                                                                  'library',
+                                                                  'top');
+                                    self._drawCards();
+                                } else if (d.text === 'B') {
+                                    self.tableData.changeCardZone(card,
+                                                                  'library',
+                                                                  'bottom');
+                                    self._drawCards();
+                                } else if (d.text === 'Play') {
+                                    self.tableData.changeCardZone(card,
+                                                                  'inPlay');
+                                    self._drawCards();
+                                } else if (d.text === 'Hand') {
+                                    self.tableData.changeCardZone(card,
+                                                                  'hand');
+                                    self._drawCards();
+                                }
+                            });
+                        cardButtons.append('rect')
+                            .attr('x', function (d) {
+                                return card.enlargedX + card.enlargedWidth / 100 * d.x;
+                            })
+                            .attr('y', function (d) {
+                                return card.enlargedY + card.enlargedWidth / 100 * d.y;
+                            })
+                            .attr('width', function (d) {
+                                return card.enlargedWidth / 100 * d.width;
+                            })
+                            .attr('height', function (d) {
+                                return card.enlargedWidth / 100 * d.height;
+                            })
+                            .attr('rx', 5)
+                            .attr('ry', 5);
+                        cardButtons.append('text')
+                            .html(function (d) {
+                                return d.text;
+                            })
+                            .style('font-size', function (d) {
+                                var size = 1 / scale
+                                return size + 'em';
+                            })
+                            .attr('x', function (d) {
+                                return card.enlargedX + card.enlargedWidth / 100 * (d.x + 2);
+                            })
+                            .attr('y', function (d) {
+                                return card.enlargedY + card.enlargedWidth / 100 * (d.y + 7);
+                            });
+                    }
+                });
+            }
         });
     };
     this.resizeSVG = function () {
