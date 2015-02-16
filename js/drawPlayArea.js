@@ -398,7 +398,6 @@ function PlayAreaSVG() {
             parent = d3.select($(this).parent()[0]);
         if (img.classed('enlarged')) {
             d.clicked = true;
-            img.attr('opacity', '0.0');
             img = d.originCard;
             parent = d3.select($(d.originCard[0]).parent()[0]);
         }
@@ -424,6 +423,7 @@ function PlayAreaSVG() {
         // parent.append(img[0]);
         if (img.classed('enlarged')) {
             d.clicked = false;
+            img.attr('opacity', '0.0');
             // move the enlarged card
             d.enlargedX += d3.event.dx;
             d.enlargedY += d3.event.dy;
@@ -445,9 +445,10 @@ function PlayAreaSVG() {
     this.drag.on('dragend', function (d) {
         var img = d3.select(this);
         if (img.classed('enlarged')) {
-            // img.attr('opacity', '1.0');
             if (!d.clicked) {
                 self.tableData.dbUpdateObject(d.originCard.data()[0]);
+            } else {
+                img.attr('opacity', '1.0');
             }
         } else {
             self.tableData.dbUpdateObject(d);
@@ -511,7 +512,12 @@ function PlayAreaSVG() {
 
         cards.enter().append('image')
             .attr('xlink:href', function (d) {
-                return d.image_url;
+                if (d.zone !== 'hand' ||
+                    d.playerName === self.tableData.playerName) {
+                    return d.image_url;
+                } else {
+                    return 'cardback.png';
+                }
             })
             .attr('x', function (d, i) {
                 if (!d.hasOwnProperty('x')) {
@@ -552,7 +558,9 @@ function PlayAreaSVG() {
                 scale = mainApp.playAreaSVG.scale;
             d.originCard = originCard;
 
-            if (scale < 0.8) {
+            if (scale < 0.8 &&
+                (d.zone !== 'hand' ||
+                 d.playerName === self.tableData.playerName)) {
                 var newCardData = d3.select('#enlargedCard').selectAll('image')
                         .data([d], function (d) {return d.image_url; }),
                     player = d3.select(d.originCard[0][0].parentNode.parentNode);
