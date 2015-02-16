@@ -40,6 +40,11 @@ function TableData() {
     this.setRoom = function (roomName) {
         this.room = roomName;
         this.lastUpdateId = -1;
+        $.post('tableState.php',
+                {
+                    action: 'change_room',
+                    room: this.room
+                });
     };
     this.setPlayer = function (playerName) {
         this.playerName = playerName;
@@ -407,7 +412,7 @@ function PlayAreaSVG() {
         });
 
         d.ordering = newOrdering;
-        self.tableData.dbUpdateObject(d);
+        // self.tableData.dbUpdateObject(d);
 
         siblings.sort(function(a, b) {
             return a.ordering - b.ordering;
@@ -531,6 +536,11 @@ function PlayAreaSVG() {
                     d.height = 310;
                 }
                 return d.height;
+            })
+            .attr('transform', function (d) {
+                var imgCenterX = d.x + d.width / 2,
+                    imgCenterY = d.y + d.height / 2;
+                return 'rotate(' + d.rotation + ' ' + imgCenterX + ' ' + imgCenterY + ')';
             })
             .call(this.drag);
         cards.exit().remove();
