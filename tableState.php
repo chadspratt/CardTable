@@ -10,16 +10,16 @@ $getStateQuery = $connection->prepare("SELECT player, zone, type, id, imageUrl,
 $addQuery = $connection->prepare("INSERT INTO CurrentState
                                  (room, player, zone, type, id,
                                  imageUrl, xPos, yPos)
-                                 SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?");
+                                 SELECT ?, ?, ?, ?, ?, ?, ?, ?");
 $updateQuery = $connection->prepare("UPDATE CurrentState SET
                                     zone = ?, xPos = ?, yPos = ?, rotation = ?,
                                     ordering = ?
                                     WHERE room = ? AND player = ? AND
                                     type = ? AND id = ?");
-$updateLibraryOrderQuery = $connection->prepare("UPDATE CurrentState SET
+$updateDeckOrderQuery = $connection->prepare("UPDATE CurrentState SET
                                     ordering = ?
                                     WHERE room = ? AND player = ? AND
-                                    id = ? AND zone = 'library'");
+                                    id = ? AND zone = 'deck'");
 $removeQuery = $connection->prepare("DELETE FROM CurrentState
                                     WHERE room = ? AND player = ? AND
                                     type = ? AND id = ?");
@@ -159,18 +159,18 @@ else
         $updateQuery->execute();
         $updateQuery->close();
     }
-    elseif ($_POST["action"] === "update_library_order")
+    elseif ($_POST["action"] === "update_deck_order")
     {
         for ($i=0; $i < count($_POST["id"]); $i++)
         {
-            $updateLibraryOrderQuery->bind_param("issi",
+            $updateDeckOrderQuery->bind_param("issi",
                                   $_POST["ordering"][$i],
                                   $_POST["room"],
                                   $_POST["player"],
                                   $_POST["id"][$i]);
-            $updateLibraryOrderQuery->execute();
+            $updateDeckOrderQuery->execute();
         }
-        $updateLibraryOrderQuery->close();
+        $updateDeckOrderQuery->close();
     }
     elseif ($_POST["action"] === "remove")
     {

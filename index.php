@@ -19,13 +19,12 @@
 
 <svg id="playAreaSVG">
   <g id="players"></g>
-  <g id="counters"></g>
+  <g id="markers"></g>
   <g id="enlargedCard"></g>
   <g id="cardButtons"></g>
 </svg>
 
 <div id="viewControls" class="overlayItem">
-  <div id="updateData" class="links">refresh</div>
   <button id="zoomOut">
     -
   </button>
@@ -49,10 +48,10 @@
     <button id="setName">Set</button>
   </div>
 
-  <div id="libraryBox" class="overlayItem inline">
-    <H2>Library (<span id="libraryCount">0</span> cards)</H2>
+  <div id="deckBox" class="overlayItem inline">
+    <H2>Deck (<span id="deckCount">0</span> cards)</H2>
     <button id="drawCard">Draw</button>
-    <button id="shuffleLibrary">Shuffle</button>
+    <button id="shuffleDeck">Shuffle</button>
     <div id="loadDeckBox" class="overlayItem inline">
       <div id="loadDeckForm">
         <textarea type="text" id="deckCSV" value="" rows="10" cols="50"></textarea>
@@ -60,6 +59,12 @@
       </div>
       <div id="loadDeckHeader" class="links">Load From CSV</div>
     </div>
+  </div>
+
+  <div id="markerBox">
+    <h4>Marker Text:</h4>
+    <input id="markerText" type="text" value="+1/+1">
+    <button id="createMarker">Create</button>
   </div>
 </div>
 

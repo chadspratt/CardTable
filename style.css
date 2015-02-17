@@ -56,3 +56,6 @@ body {
 .button rect {
     fill: rgb(106, 164, 223);
 }
+.marker rect {
+    fill: rgb(155, 255, 155);
+}

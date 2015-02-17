@@ -7,13 +7,14 @@ function Player(name) {
     'use strict';
     this.name = name;
     this.zones = {};
-    this.counters = [];
+    this.nextMarkerId = 0;
+    this.markers = [];
 
     this.getZonesAsArray = function () {
         var zoneArray = [];
         for (var zone in this.zones) {
             if (this.zones.hasOwnProperty(zone) &&
-                zone !== 'library') {
+                zone !== 'deck') {
                 zoneArray.push(this.zones[zone]);
             }
         }
@@ -50,7 +51,7 @@ function TableData() {
         this.playerName = playerName;
         if (!this.players.hasOwnProperty(playerName)) {
             this.players[playerName] = new Player(playerName);
-            this.players[playerName].zones['library'] = new Zone('library');
+            this.players[playerName].zones['deck'] = new Zone('deck');
         }
         this.player = this.players[playerName];
     };
@@ -107,18 +108,18 @@ function TableData() {
                     'json');
         }
     };
-    this.dbUpdateLibraryOrdering = function () {
+    this.dbUpdateDeckOrdering = function () {
         if (this.room !== null && this.player !== null) {
-            var library = this.player.zones['library'].cards,
+            var deck = this.player.zones['deck'].cards,
                 objectIds = [],
                 orderings = [];
-            for (var i = 0; i < library.length; i++) {
-                objectIds.push(library[i].id);
-                orderings.push(library[i].ordering);
+            for (var i = 0; i < deck.length; i++) {
+                objectIds.push(deck[i].id);
+                orderings.push(deck[i].ordering);
             }
             $.post('tableState.php',
                     {
-                        action: 'update_library_order',
+                        action: 'update_deck_order',
                         room: this.room,
                         player: this.playerName,
                         'id[]': objectIds,
@@ -188,15 +189,18 @@ function TableData() {
                     rotation: object.rotation,
                     ordering: object.ordering
                 });
-            } else if (object.type === 'counter') {
-                player.counters.push({
+            } else if (object.type === 'marker') {
+                player.markers.push({
                     type: object.type,
                     id: object.id,
-                    image_url: object.imageUrl,
+                    text: object.imageUrl,
                     x: object.xPos,
                     y: object.yPos,
                     playerName: object.player
                 });
+                if (object.id >= player.nextMarkerId) {
+                    player.nextMarkerId = object.id + 1;
+                }
             }
         }
         for (var playerName in this.players) {
@@ -218,16 +222,16 @@ function TableData() {
         this.deckCSV = deckCSV;
         this._dbRemovePlayerObjects();
         this.player.zones = {};
-        this.player.zones['library'] = new Zone('library');
-        this.player.zones['library'].cards = $.csv.toObjects(deckCSV);
+        this.player.zones['deck'] = new Zone('deck');
+        this.player.zones['deck'].cards = $.csv.toObjects(deckCSV);
 
         var duplicateCards = [],
-            library = this.player.zones['library'].cards;
-        for (var i = 0; i < library.length; i++) {
-            var card = library[i];
+            deck = this.player.zones['deck'].cards;
+        for (var i = 0; i < deck.length; i++) {
+            var card = deck[i];
             // assign an id to each card
             card.id = i;
-            card.zone = 'library';
+            card.zone = 'deck';
             card.type = 'card';
             card.rotation = 0;
 
@@ -237,50 +241,68 @@ function TableData() {
                     // NAME: card.NAME,
                     image_url: card.image_url,
                     count: card.count,
-                    id: library.length + duplicateCards.length,
-                    zone: 'library',
+                    id: deck.length + duplicateCards.length,
+                    zone: 'deck',
                     type: 'card',
                     rotation: 0
                 });
             }
         }
-        library = library.concat(duplicateCards);
-        this.player.zones['library'].cards = library;
-        this._dbAddObjects('card', library, 'library');
-        $('#libraryCount').text(library.length);
+        deck = deck.concat(duplicateCards);
+        this.player.zones['deck'].cards = deck;
+        this._dbAddObjects('card', deck, 'deck');
+        $('#deckCount').text(deck.length);
     };
-    this.clearCounters = function () {
-        this.player.counters = [];
+    this.createMarker = function (text) {
+        var newMarker = {
+            id: this.player.nextMarkerId,
+            text: text,
+            // to cram it in the same table as cards
+            image_url: text,
+            x: 0,
+            y: 0,
+            player: this.playerName,
+            type: 'marker',
+            ordering: 0
+        };
+        this.player.markers.push(newMarker);
+        this.player.nextMarkerId += 1;
+        this._dbAddObjects('marker',
+                           [newMarker],
+                           'ontop');
+    };
+    this.clearMarkers = function () {
+        this.player.markers = [];
     };
     this.resetDeck = function () {
         for (zone in this.player.zones) {
             if (this.player.zones.hasOwnProperty(zone) &&
-                    zone !== 'library') {
-                this.player.zones['library'].cards.concat(this.player.zones[zone].cards);
+                    zone !== 'deck') {
+                this.player.zones['deck'].cards.concat(this.player.zones[zone].cards);
                 this.player.zones[zone].cards = [];
             }
         }
-        $('#libraryCount').text(this.player.zones['library'].length);
-        this.shuffleLibrary();
+        $('#deckCount').text(this.player.zones['deck'].length);
+        this.shuffleDeck();
     };
 
-    this.shuffleLibrary = function () {
-        var library = this.player.zones['library'].cards;
-        for (var i = library.length - 1; i > 0; i--) {
+    this.shuffleDeck = function () {
+        var deck = this.player.zones['deck'].cards;
+        for (var i = deck.length - 1; i > 0; i--) {
             var j = Math.floor(Math.random() * (i + 1));
-            var temp = library[i];
-            library[i] = library[j];
-            library[j] = temp;
+            var temp = deck[i];
+            deck[i] = deck[j];
+            deck[j] = temp;
         }
-        for (var i = library.length - 1; i > 0; i--) {
-            library[i].ordering = i;
+        for (var i = deck.length - 1; i > 0; i--) {
+            deck[i].ordering = i;
         }
-        this.dbUpdateLibraryOrdering();
+        this.dbUpdateDeckOrdering();
     };
     this.drawCard = function () {
-        var library = this.player.zones['library'].cards;
-        if (library.length > 0) {
-            this.changeCardZone(library[library.length - 1],
+        var deck = this.player.zones['deck'].cards;
+        if (deck.length > 0) {
+            this.changeCardZone(deck[deck.length - 1],
                                 'hand');
         }
     };
@@ -301,7 +323,7 @@ function TableData() {
             }
             var targetCards = this.player.zones[targetZone].cards,
                 newOrdering = 0;
-            if (targetZone === 'library' &&
+            if (targetZone === 'deck' &&
                 end === 'bottom') {
                 for (i = 0; i < targetCards.length; i++) {
                     if (targetCards[i].ordering <= newOrdering) {
@@ -394,11 +416,11 @@ function PlayAreaSVG() {
         d3.event.sourceEvent.stopPropagation(); // silence other listeners
         // if it is an enlarged card, make it transparent so you can see where
         // you're dragging the actual-size card
-        var img = d3.select(this),
+        var drugObject = d3.select(this),
             parent = d3.select($(this).parent()[0]);
-        if (img.classed('enlarged')) {
+        if (drugObject.classed('enlarged')) {
             d.clicked = true;
-            img = d.originCard;
+            drugObject = d.originCard;
             parent = d3.select($(d.originCard[0]).parent()[0]);
         }
         // put the card on top of other cards in its group
@@ -418,37 +440,46 @@ function PlayAreaSVG() {
         });
     });
     this.drag.on('drag', function (d) {
-        var img = d3.select(this),
+        var drugObject = d3.select(this),
             parent = d3.select($(this).parent()[0]);
-        // parent.append(img[0]);
-        if (img.classed('enlarged')) {
+        // parent.append(drugObject[0]);
+        if (drugObject.classed('enlarged')) {
             d.clicked = false;
-            img.attr('opacity', '0.0');
+            drugObject.attr('opacity', '0.0');
             // move the enlarged card
             d.enlargedX += d3.event.dx;
             d.enlargedY += d3.event.dy;
 
-            img.attr('x', d.enlargedX)
+            drugObject.attr('x', d.enlargedX)
                 .attr('y', d.enlargedY);
 
             // move source card beneath it too
-            img = d.originCard;
+            drugObject = d.originCard;
         }
 
         // XXX this doesn't work correctly when dragging another player's cards
         // move the card
         d.x += d3.event.dx;
         d.y += d3.event.dy;
-        img.attr('x', d.x)
-            .attr('y', d.y);
+        if (drugObject.classed('marker')) {
+            var markerRect = drugObject.select('rect'),
+                markerText = drugObject.select('text');
+            markerRect.attr('x', d.x)
+                .attr('y', d.y);
+            markerText.attr('x', d.x + 2)
+                .attr('y', d.y + 18);
+        } else {
+            drugObject.attr('x', d.x)
+                .attr('y', d.y);
+        }
     });
     this.drag.on('dragend', function (d) {
-        var img = d3.select(this);
-        if (img.classed('enlarged')) {
+        var drugObject = d3.select(this);
+        if (drugObject.classed('enlarged')) {
             if (!d.clicked) {
                 self.tableData.dbUpdateObject(d.originCard.data()[0]);
             } else {
-                img.attr('opacity', '1.0');
+                drugObject.attr('opacity', '1.0');
             }
         } else {
             self.tableData.dbUpdateObject(d);
@@ -467,6 +498,7 @@ function PlayAreaSVG() {
                         if (!data.hasOwnProperty('no_changes')) {
                             self.tableData.processRoomState(data);
                             self._drawCards();
+                            self.drawMarkers();
                         }
                         self.updateFromServer();
                     },
@@ -484,7 +516,9 @@ function PlayAreaSVG() {
         d3.select('#cardButtons').selectAll("*").remove();
 
         var currentPlayer = this.tableData.player;
-        $('#libraryCount').text(currentPlayer.zones['library'].cards.length);
+        if (currentPlayer.zones.hasOwnProperty('deck')) {
+            $('#deckCount').text(currentPlayer.zones['deck'].cards.length);
+        }
 
         var playerArray = this.tableData.getPlayerArray();
         var players = d3.select('#players').selectAll('g')
@@ -554,11 +588,10 @@ function PlayAreaSVG() {
             return a.ordering - b.ordering;
         });
         cards.on('mousemove', function showEnlargedCard(d) {
-            var originCard = d3.select(this),
-                scale = mainApp.playAreaSVG.scale;
+            var originCard = d3.select(this);
             d.originCard = originCard;
 
-            if (scale < 0.8 &&
+            if (self.scale < 0.8 &&
                 (d.zone !== 'hand' ||
                  d.playerName === self.tableData.playerName)) {
                 var newCardData = d3.select('#enlargedCard').selectAll('image')
@@ -580,19 +613,19 @@ function PlayAreaSVG() {
                         return d.image_url;
                     })
                     .attr('x', function (d) {
-                        d.enlargedX = d.x + (d.width * scale - d.width) / (2 * scale);
+                        d.enlargedX = d.x + (d.width * self.scale - d.width) / (2 * self.scale);
                         return d.enlargedX;
                     })
                     .attr('y', function (d) {
-                        d.enlargedY = d.y + (d.height * scale - d.height) / (2 * scale);
+                        d.enlargedY = d.y + (d.height * self.scale - d.height) / (2 * self.scale);
                         return d.enlargedY;
                     })
                     .attr('width', function (d) {
-                        d.enlargedWidth = d.width / scale;
+                        d.enlargedWidth = d.width / self.scale;
                         return d.enlargedWidth;
                     })
                     .attr('height', function (d) {
-                        d.enlargedHeight = d.height / scale;
+                        d.enlargedHeight = d.height / self.scale;
                         return d.enlargedHeight;
                     })
                     .on('mousemove', function (d) {
@@ -656,21 +689,21 @@ function PlayAreaSVG() {
                             width: 40,
                             height: 10
                         },
-                        libraryBottom: {
+                        deckBottom: {
                             text: 'B',
                             x: 10,
                             y: 35,
                             width: 10,
                             height: 10
                         },
-                        library: {
-                            text: 'Library',
+                        deck: {
+                            text: 'Deck',
                             x: 30,
                             y: 35,
                             width: 40,
                             height: 10
                         },
-                        libraryTop: {
+                        deckTop: {
                             text: 'T',
                             x: 80,
                             y: 35,
@@ -683,19 +716,19 @@ function PlayAreaSVG() {
                     if (d.zone === 'hand') {
                         buttons = [
                             buttonData.play,
-                            buttonData.libraryTop,
-                            buttonData.library,
-                            buttonData.libraryBottom
-                        ]
+                            buttonData.deckTop,
+                            buttonData.deck,
+                            buttonData.deckBottom
+                        ];
                     } else if (d.zone === 'inPlay') {
                         buttons = [
                             buttonData.rotateLeft,
                             buttonData.hand,
                             buttonData.rotateRight,
-                            buttonData.libraryTop,
-                            buttonData.library,
-                            buttonData.libraryBottom
-                        ]
+                            buttonData.deckTop,
+                            buttonData.deck,
+                            buttonData.deckBottom
+                        ];
                     }
 
                     d3.select('#cardButtons').selectAll("*").remove();
@@ -713,12 +746,12 @@ function PlayAreaSVG() {
                                 self._drawCards();
                             } else if (d.text === 'T') {
                                 self.tableData.changeCardZone(card,
-                                                              'library',
+                                                              'deck',
                                                               'top');
                                 self._drawCards();
                             } else if (d.text === 'B') {
                                 self.tableData.changeCardZone(card,
-                                                              'library',
+                                                              'deck',
                                                               'bottom');
                                 self._drawCards();
                             } else if (d.text === 'Play') {
@@ -752,7 +785,7 @@ function PlayAreaSVG() {
                             return d.text;
                         })
                         .style('font-size', function (d) {
-                            var size = 1 / scale
+                            var size = 1 / self.scale
                             return size + 'em';
                         })
                         .attr('x', function (d) {
@@ -764,6 +797,60 @@ function PlayAreaSVG() {
                 });
             }
         });
+    };
+    this.drawMarkers = function () {
+        var playerArray = this.tableData.getPlayerArray();
+        var players = d3.select('#markers').selectAll('g')
+            .data(playerArray,
+                  function (d) { return d.name; });
+        players.enter().append('g');
+        players
+            .attr('transform', function (d) {
+                d.rotation = 360 / playerArray.length * d.order;
+                d.yOffset = -300 * (playerArray.length);
+
+                return 'rotate(' + d.rotation + ' 100 ' + d.yOffset + ')';
+            });
+        players.exit().remove();
+
+        var markers = players.selectAll('g')
+            .data(function (d) { return d.markers; },
+                  function (d) { return d.id; });
+        markers.enter().append('g')
+            .classed('marker', true);
+        markers.exit().remove();
+
+        markers.append('rect')
+            .attr('x', function (d) {
+                return d.x;
+            })
+            .attr('y', function (d) {
+                return d.y;
+            })
+            .attr('rx', 5)
+            .attr('ry', 5);
+        markers.append('text')
+            .html(function (d) {
+                return d.text;
+            })
+            .style('font-size', function (d) {
+                var size = 1 / self.scale;
+                return size + 'em';
+            })
+            .attr('x', function (d) {
+                return d.x + 2;
+            })
+            .attr('y', function (d) {
+                return d.y + 18;
+            });
+
+        markers.each(function (d) {
+            var textSize = d3.select(this).select('text').node().getBBox();
+            d3.select(this).select('rect')
+                .attr("width", textSize.width + 4)
+                .attr("height", textSize.height + 4);
+        });
+        markers.call(self.drag);
     };
     this.resizeSVG = function () {
         // http://stackoverflow.com/a/16265661/225730
@@ -962,8 +1049,8 @@ $(document).ready(function initialSetup() {
         mainApp.playAreaSVG.tableData.loadDeckFromCSV(deckCSV);
         $('#loadDeckForm').hide();
     });
-    $('#shuffleLibrary').on('click', function shuffleLibrary() {
-        mainApp.playAreaSVG.tableData.shuffleLibrary();
+    $('#shuffleDeck').on('click', function shuffleDeck() {
+        mainApp.playAreaSVG.tableData.shuffleDeck();
     });
     $('#drawCard').on('click', function drawCard() {
         mainApp.playAreaSVG.drawCard();
@@ -974,5 +1061,9 @@ $(document).ready(function initialSetup() {
     $('#setName').on('click', function setPlayer() {
         mainApp.playAreaSVG.tableData.setPlayer($('#playerName').val());
         mainApp.playAreaSVG._drawCards();
+    });
+    $('#createMarker').on('click', function setPlayer() {
+        mainApp.playAreaSVG.tableData.createMarker($('#markerText').val());
+        mainApp.playAreaSVG.drawMarkers();
     });
 });
