@@ -33,17 +33,19 @@
   </button>
 </div>
 
-<div id="coordDisplay" class="overlayItem">x: z:</div>
+<div id="coordDisplay" class="overlayItem">x: y:</div>
+<div id="motionDisplay" class="overlayItem">dx: dy:</div>
+<div id="motionDisplayCorrected" class="overlayItem">dx: dy:</div>
 
 <div id="gameControls">
   <div id="roomNameBox">
-    <h4>Room Name:</h4>
+    <h4>Room:</h4>
     <input id="roomName" type="text" value="Room">
     <button id="setRoom">Join</button>
   </div>
 
   <div id="playerNameBox">
-    <h4>Player Name:</h4>
+    <h4>Player:</h4>
     <input id="playerName" type="text" value="defaultPlayer">
     <button id="setName">Set</button>
   </div>

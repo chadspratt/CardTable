@@ -24,6 +24,18 @@ body {
     bottom: 10px;
     max-width: 200px;
 }
+#motionDisplay {
+    position: absolute;
+    left: 10px;
+    bottom: 30px;
+    max-width: 200px;
+}
+#motionDisplayCorrected {
+    position: absolute;
+    left: 10px;
+    bottom: 70px;
+    max-width: 200px;
+}
 #gameControls {
     position: absolute;
     top: 10px;

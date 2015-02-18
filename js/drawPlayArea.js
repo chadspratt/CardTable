@@ -1,7 +1,5 @@
 /*global $ */
-var mainApp,
-    // used for a popup for adding/editing wiki data
-    handWindow = null;
+var mainApp;
 
 function Player(name) {
     'use strict';
@@ -395,6 +393,9 @@ function PlayAreaSVG() {
     this.featureIconSize = 15;
     this.needUpdate = false;
     this.featureClicked = false;
+    this.featureDragging = false;
+    // point that all players are rotated around.
+    // y varies based on number of players
 
     this.init = function () {
         var canvasOffset;
@@ -413,13 +414,18 @@ function PlayAreaSVG() {
 
     this.drag = d3.behavior.drag();
     this.drag.on('dragstart', function(d) {
+        self.featureDragging = true;
+        self.dragOffset = {x: null,
+                           y: null};
         d3.event.sourceEvent.stopPropagation(); // silence other listeners
-        // if it is an enlarged card, make it transparent so you can see where
-        // you're dragging the actual-size card
         var drugObject = d3.select(this),
             parent = d3.select($(this).parent()[0]);
         if (drugObject.classed('enlarged')) {
             d.clicked = true;
+            drugObject.attr('x', d.x)
+                .attr('y', d.y)
+                .attr('height', d.height)
+                .attr('width', d.width);
             drugObject = d.originCard;
             parent = d3.select($(d.originCard[0]).parent()[0]);
         }
@@ -440,27 +446,40 @@ function PlayAreaSVG() {
         });
     });
     this.drag.on('drag', function (d) {
-        var drugObject = d3.select(this),
-            parent = d3.select($(this).parent()[0]);
-        // parent.append(drugObject[0]);
-        if (drugObject.classed('enlarged')) {
-            d.clicked = false;
-            drugObject.attr('opacity', '0.0');
-            // move the enlarged card
-            d.enlargedX += d3.event.dx;
-            d.enlargedY += d3.event.dy;
+        d.clicked = false;
+        var drugObject = d3.select(this);
+        if (self.dragOffset.x === null) {
+            self.dragOffset = {
+                x: d.x - d3.event.x,
+                y: d.y - d3.event.y,
+                enlargedX: d.enlargedX - d3.event.x,
+                enlargedY: d.enlargedY - d3.event.y,
+            };
+        }
 
-            drugObject.attr('x', d.enlargedX)
-                .attr('y', d.enlargedY);
+        d.x = d3.event.x + self.dragOffset.x;
+        d.y = d3.event.y + self.dragOffset.y;
+
+        $('#motionDisplay').html('dx: ' + d3.event.dx + ' dy: ' + d3.event.dy);
+        mainApp.setCoordDisplay(d3.event.x, d3.event.y);
+        if (drugObject.classed('enlarged')) {
+            // drugObject.attr('opacity', '0.0');
+            // d.originCard.attr('opacity', '0.0');
+
+            d.enlargedX = d3.event.x + self.dragOffset.enlargedX;
+            d.enlargedY = d3.event.y + self.dragOffset.enlargedY;
+
+            drugObject
+                .attr('x', d.x)
+                .attr('y', d.y);
 
             // move source card beneath it too
             drugObject = d.originCard;
         }
 
-        // XXX this doesn't work correctly when dragging another player's cards
         // move the card
-        d.x += d3.event.dx;
-        d.y += d3.event.dy;
+        d.x = d3.event.x + self.dragOffset.x;
+        d.y = d3.event.y + self.dragOffset.y;
         if (drugObject.classed('marker')) {
             var markerRect = drugObject.select('rect'),
                 markerText = drugObject.select('text');
@@ -474,12 +493,17 @@ function PlayAreaSVG() {
         }
     });
     this.drag.on('dragend', function (d) {
+        self.featureDragging = false;
         var drugObject = d3.select(this);
         if (drugObject.classed('enlarged')) {
+            d.originCard.attr('opacity', '1.0');
             if (!d.clicked) {
                 self.tableData.dbUpdateObject(d.originCard.data()[0]);
             } else {
-                drugObject.attr('opacity', '1.0');
+                drugObject.attr('x', d.enlargedX)
+                    .attr('y', d.enlargedY)
+                    .attr('height', d.enlargedHeight)
+                    .attr('width', d.enlargedWidth);
             }
         } else {
             self.tableData.dbUpdateObject(d);
@@ -527,10 +551,10 @@ function PlayAreaSVG() {
         players.enter().append('g');
         players
             .attr('transform', function (d) {
-                d.rotation = 360 / playerArray.length * d.order;
-                d.yOffset = -300 * (playerArray.length);
+                var rotation = 360 / playerArray.length * d.order,
+                    yOffset = -300 * (playerArray.length);
 
-                return 'rotate(' + d.rotation + ' 100 ' + d.yOffset + ')';
+                return 'rotate(' + rotation + ' 100 ' + yOffset + ')';
             });
         players.exit().remove();
 
@@ -592,23 +616,31 @@ function PlayAreaSVG() {
             d.originCard = originCard;
 
             if (self.scale < 0.8 &&
-                (d.zone !== 'hand' ||
-                 d.playerName === self.tableData.playerName)) {
-                var newCardData = d3.select('#enlargedCard').selectAll('image')
+                !self.featureDragging &&
+                (d.playerName === self.tableData.playerName ||
+                 d.zone !== 'hand')) {
+                var player = d3.select(d.originCard[0][0].parentNode.parentNode),
+                    enlargedCardZone = d3.select('#enlargedCard');
+                enlargedCardZone
+                    .attr('transform', function (d) {
+                        return player.attr('transform');
+                    });
+                var newCardData = enlargedCardZone.selectAll('image')
                         .data([d], function (d) {return d.image_url; }),
                     player = d3.select(d.originCard[0][0].parentNode.parentNode);
                 mainApp.enlargedCard = newCardData.enter().append('image');
                 mainApp.enlargedCard
                     .classed('enlarged', true)
-                    .attr('transform', function (d) {
-                        var imgCenterX = d.x + d.width / 2,
-                            imgCenterY = d.y + d.height / 2,
-                            playerData = player.datum(),
-                            rotation = playerData.rotation * -1;
-                            // var rotation = 360 / playerArray.length * d.order,
-                        return player.attr('transform') + ' rotate(' + rotation +
-                               ' ' + imgCenterX + ' ' + imgCenterY + ')';
-                    })
+                    // .attr('transform', function (d) {
+                    //     var imgCenterX = d.x + d.width / 2,
+                    //         imgCenterY = d.y + d.height / 2,
+                    //         playerData = player.datum(),
+                    //         rotation = playerData.rotation * -1;
+                    //         // var rotation = 360 / playerArray.length * d.order,
+                    //     // return player.attr('transform') + ' rotate(' + rotation +
+                    //     //        ' ' + imgCenterX + ' ' + imgCenterY + ')';
+                    //     return player.attr('transform');
+                    // })
                     .attr('xlink:href', function (d) {
                         return d.image_url;
                     })
@@ -632,7 +664,7 @@ function PlayAreaSVG() {
                         var svgCoords = self.getSVGCoordinates(d3.event.x,
                                                                d3.event.y);
                         // XXX need to rotate d.x and y for this to work for
-                        // other player's cards
+                        // rotated cards
                         if (self.tableData.playerName === d.playerName) {
                             if (svgCoords.x < d.x ||
                                 svgCoords.x > d.x + d.width ||
@@ -646,7 +678,9 @@ function PlayAreaSVG() {
                     // backup in case the mouse doesn't get caught in the
                     // mousemove removal zone
                     .on('mouseleave', function (d) {
-                        d3.select(this).remove();
+                        if (!self.featureDragging) {
+                            d3.select(this).remove();
+                        }
                     })
                 mainApp.enlargedCard.call(self.drag);
                 newCardData.exit().remove();
@@ -983,9 +1017,9 @@ function MainApp() {
             this.playAreaSVG.continuePan(pageX, pageY);
         // update cursor coordinates
         } else {
-            mousePos = this.playAreaSVG.getSVGCoordinates(pageX,
-                                                          pageY);
-            this.setCoordDisplay(mousePos.x, mousePos.y);
+            // mousePos = this.playAreaSVG.getSVGCoordinates(pageX,
+            //                                               pageY);
+            // this.setCoordDisplay(mousePos.x, mousePos.y);
         }
     };
     this.endMouse = function (pageX, pageY) {
