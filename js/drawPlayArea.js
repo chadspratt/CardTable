@@ -394,6 +394,7 @@ function PlayAreaSVG() {
     this.needUpdate = false;
     this.featureClicked = false;
     this.featureDragging = false;
+    self.buttonsDisplayed = false;
     this.playerRotations = {};
     // point that all players are rotated around.
     // y varies based on number of players
@@ -683,9 +684,11 @@ function PlayAreaSVG() {
                     .on('mousemove', function (d) {
                         var svgCoords = self.getSVGCoordinates(d3.event.x,
                                                                d3.event.y);
+                        mainApp.setCoordDisplay(d3.event.x, d3.event.y);
                         // XXX need to rotate d.x and y for this to work for
                         // rotated cards
-                        if (self.tableData.playerName === d.playerName) {
+                        if (self.tableData.playerName === d.playerName &&
+                            !self.buttonsDisplayed) {
                             if (svgCoords.x < d.x ||
                                 svgCoords.x > d.x + d.width ||
                                 svgCoords.y < d.y ||
@@ -698,8 +701,11 @@ function PlayAreaSVG() {
                     // backup in case the mouse doesn't get caught in the
                     // mousemove removal zone
                     .on('mouseleave', function (d) {
-                        if (!self.featureDragging) {
+                        if (!self.featureDragging &&
+                            d3.event.toElement.nodeName !== 'rect') {
                             d3.select(this).remove();
+                            d3.select('#cardButtons').html('');
+                            self.buttonsDisplayed = false;
                         }
                     })
                 mainApp.enlargedCard.call(self.drag);
@@ -711,6 +717,7 @@ function PlayAreaSVG() {
                     {
                         return;
                     }
+                    self.buttonsDisplayed = true;
                     // show buttons for own cards
                     var card = d;
                     // x/y/width/height are percentages of enlarged card width
@@ -818,6 +825,7 @@ function PlayAreaSVG() {
                                 self._drawCards();
                             }
                             d3.select('#cardButtons').selectAll("*").remove();
+                            d3.select('#enlargedCard').selectAll("*").remove();
                         });
                     cardButtons.append('rect')
                         .attr('x', function (d) {
