@@ -394,8 +394,11 @@ function PlayAreaSVG() {
     this.needUpdate = false;
     this.featureClicked = false;
     this.featureDragging = false;
+    this.playerRotations = {};
     // point that all players are rotated around.
     // y varies based on number of players
+    this.playerRotationPoint = {x: 100,
+                                y: 0};
 
     this.init = function () {
         var canvasOffset;
@@ -463,7 +466,7 @@ function PlayAreaSVG() {
         $('#motionDisplay').html('dx: ' + d3.event.dx + ' dy: ' + d3.event.dy);
         mainApp.setCoordDisplay(d3.event.x, d3.event.y);
         if (drugObject.classed('enlarged')) {
-            // drugObject.attr('opacity', '0.0');
+            drugObject.attr('opacity', '0.0');
             // d.originCard.attr('opacity', '0.0');
 
             d.enlargedX = d3.event.x + self.dragOffset.enlargedX;
@@ -471,7 +474,15 @@ function PlayAreaSVG() {
 
             drugObject
                 .attr('x', d.x)
-                .attr('y', d.y);
+                .attr('y', d.y)
+                .attr('transform', function (d) {
+                    var imgCenterX = d.x + d.width / 2,
+                        imgCenterY = d.y + d.height / 2,
+                        rotation = -1 * self.playerRotations[d.playerName].degrees;
+                    return 'rotate(' + rotation + ' ' +
+                                       imgCenterX + ' ' +
+                                       imgCenterY + ')';
+                });
 
             // move source card beneath it too
             drugObject = d.originCard;
@@ -489,14 +500,19 @@ function PlayAreaSVG() {
                 .attr('y', d.y + 18);
         } else {
             drugObject.attr('x', d.x)
-                .attr('y', d.y);
+                .attr('y', d.y)
+            .attr('transform', function (d) {
+                var imgCenterX = d.x + d.width / 2,
+                    imgCenterY = d.y + d.height / 2;
+                return 'rotate(' + d.rotation + ' ' + imgCenterX + ' ' + imgCenterY + ')';
+            });
         }
     });
     this.drag.on('dragend', function (d) {
         self.featureDragging = false;
         var drugObject = d3.select(this);
         if (drugObject.classed('enlarged')) {
-            d.originCard.attr('opacity', '1.0');
+            // d.originCard.attr('opacity', '1.0');
             if (!d.clicked) {
                 self.tableData.dbUpdateObject(d.originCard.data()[0]);
             } else {
@@ -545,16 +561,22 @@ function PlayAreaSVG() {
         }
 
         var playerArray = this.tableData.getPlayerArray();
+        this.playerRotationPoint = {x: 100,
+                                    y: -300 * (playerArray.length)};
         var players = d3.select('#players').selectAll('g')
             .data(playerArray,
                   function (d) { return d.name; });
         players.enter().append('g');
         players
             .attr('transform', function (d) {
-                var rotation = 360 / playerArray.length * d.order,
-                    yOffset = -300 * (playerArray.length);
+                var rotation = 360 / playerArray.length * d.order;
+                self.playerRotations[d.name] = {
+                    degrees: rotation,
+                    radians: rotation  * (Math.PI / 180)};
 
-                return 'rotate(' + rotation + ' 100 ' + yOffset + ')';
+                return 'rotate(' + rotation + ' ' +
+                               self.playerRotationPoint.x + ' ' +
+                               self.playerRotationPoint.y + ')';
             });
         players.exit().remove();
 
@@ -631,16 +653,14 @@ function PlayAreaSVG() {
                 mainApp.enlargedCard = newCardData.enter().append('image');
                 mainApp.enlargedCard
                     .classed('enlarged', true)
-                    // .attr('transform', function (d) {
-                    //     var imgCenterX = d.x + d.width / 2,
-                    //         imgCenterY = d.y + d.height / 2,
-                    //         playerData = player.datum(),
-                    //         rotation = playerData.rotation * -1;
-                    //         // var rotation = 360 / playerArray.length * d.order,
-                    //     // return player.attr('transform') + ' rotate(' + rotation +
-                    //     //        ' ' + imgCenterX + ' ' + imgCenterY + ')';
-                    //     return player.attr('transform');
-                    // })
+                    .attr('transform', function (d) {
+                        var imgCenterX = d.x + d.width / 2,
+                            imgCenterY = d.y + d.height / 2,
+                            rotation = -1 * self.playerRotations[d.playerName].degrees;
+                        return 'rotate(' + rotation + ' ' +
+                                           imgCenterX + ' ' +
+                                           imgCenterY + ')';
+                    })
                     .attr('xlink:href', function (d) {
                         return d.image_url;
                     })
