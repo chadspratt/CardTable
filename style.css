@@ -12,11 +12,17 @@ body {
 .hiddenFeatureGroup {
     display: none;
 }
-#viewControls {
+/*#viewControls {
     position: absolute;
     top: 10px;
     left: 10px;
     max-width: 100px;
+}*/
+#scoreBoard {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    max-width: 400px;
 }
 #coordDisplay {
     position: absolute;

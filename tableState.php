@@ -11,6 +11,16 @@ $addQuery = $connection->prepare("INSERT INTO CurrentState
                                  (room, player, zone, type, id,
                                  imageUrl, xPos, yPos)
                                  SELECT ?, ?, ?, ?, ?, ?, ?, ?");
+$addPlayerQuery = $connection->prepare("INSERT INTO CurrentState
+                                 (room, player, type, imageUrl)
+                                 SELECT ?, ?, ?, ?");
+$updatePlayerScoreQuery = $connection->prepare("UPDATE CurrentState SET
+                                    rotation = ?
+                                    WHERE room = ? AND player = ? AND
+                                    type = \"player\"");
+$updatePlayerNameQuery = $connection->prepare("UPDATE CurrentState SET
+                                    player = ?
+                                    WHERE room = ? AND player = ?");
 $updateQuery = $connection->prepare("UPDATE CurrentState SET
                                     zone = ?, xPos = ?, yPos = ?, rotation = ?,
                                     ordering = ?
@@ -143,6 +153,34 @@ else
             $addQuery->execute();
         }
         $addQuery->close();
+    }
+    elseif ($_POST["action"] === "addPlayer")
+    {
+        $addPlayerQuery->bind_param("ssss",
+                                    $_POST["room"],
+                                    $_POST["player"],
+                                    $_POST["type"],
+                                    $_POST["image_url"]);
+        $addPlayerQuery->execute();
+        $addPlayerQuery->close();
+    }
+    elseif ($_POST["action"] === "updatePlayerScore")
+    {
+        $updatePlayerScoreQuery->bind_param("iss",
+                                            $_POST["rotation"],
+                                            $_POST["room"],
+                                            $_POST["player"]);
+        $updatePlayerScoreQuery->execute();
+        $updatePlayerScoreQuery->close();
+    }
+    elseif ($_POST["action"] === "updatePlayerName")
+    {
+        $updatePlayerNameQuery->bind_param("sss",
+                                           $_POST["new_player"],
+                                           $_POST["room"],
+                                           $_POST["old_player"]);
+        $updatePlayerNameQuery->execute();
+        $updatePlayerNameQuery->close();
     }
     elseif ($_POST["action"] === "update")
     {

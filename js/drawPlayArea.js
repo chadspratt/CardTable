@@ -7,6 +7,7 @@ function Player(name) {
     this.zones = {};
     this.nextMarkerId = 0;
     this.markers = [];
+    this.cardCount = 0;
 
     this.getZonesAsArray = function () {
         var zoneArray = [];
@@ -34,6 +35,7 @@ function TableData() {
     this.playerName = null;
     this.player = null;
     this.players = {};
+    this.playerCount = 0;
     this.lastUpdateId = -1;
 
     this.setRoom = function (roomName) {
@@ -46,14 +48,48 @@ function TableData() {
                 });
     };
     this.setPlayer = function (playerName) {
-        this.playerName = playerName;
+            // check if its a new name
         if (!this.players.hasOwnProperty(playerName)) {
             this.players[playerName] = new Player(playerName);
             this.players[playerName].zones['deck'] = new Zone('deck');
         }
+
+        this.playerName = playerName;
         this.player = this.players[playerName];
     };
-
+    this.setName = function (playerName) {
+        // check if its a different name
+        if (playerName !== this.playerName &&
+            !this.players.hasOwnProperty(playerName)) {
+            // change name on server
+            $.post('tableState.php',
+                    {
+                        action: 'updatePlayerName',
+                        room: this.room,
+                        new_player: playerName,
+                        old_player: this.playerName,
+                    },
+                    function (data) {
+                        self.lastUpdateId = data.last_update_id;
+                    },
+                    'json');
+        }
+        this.setPlayer(playerName);
+    };
+    this.updatePlayerScore = function (name, score) {
+        $.post('tableState.php',
+                {
+                    action: 'updatePlayerScore',
+                    room: this.room,
+                    player: name,
+                    // storing score in rotation
+                    rotation: score
+                },
+                function (data) {
+                    self.lastUpdateId = data.last_update_id;
+                },
+                'json');
+    };
     this._dbAddObjects = function (objectType, objects, zone) {
         if (this.room !== null && this.player !== null) {
             var objectIds = [],
@@ -163,19 +199,22 @@ function TableData() {
     this.processRoomState = function (newData) {
         // clear old data
         this.players = {};
+        this.playerCount = 0;
         this.lastUpdateId = newData.change_id;
         for (var i = 0; i < newData.results.length; i++) {
             var object = newData.results[i];
             if (!this.players.hasOwnProperty(object.player)) {
                 this.players[object.player] = new Player(object.player);
+                this.playerCount += 1;
             }
             var player = this.players[object.player];
             if (!player.zones.hasOwnProperty(object.zone)) {
                 player.zones[object.zone] = new Zone(object.zone);
             }
-            var zone = player.zones[object.zone];
 
             if (object.type === 'card') {
+                this.players[object.player].cardCount += 1;
+                var zone = player.zones[object.zone];
                 zone.cards.push({
                     type: object.type,
                     zone: object.zone,
@@ -199,6 +238,9 @@ function TableData() {
                 if (object.id >= player.nextMarkerId) {
                     player.nextMarkerId = object.id + 1;
                 }
+            } else if (object.type === 'player') {
+                player.score = parseInt(object.rotation);
+                player.ordering = object.ordering;
             }
         }
         for (var playerName in this.players) {
@@ -210,6 +252,22 @@ function TableData() {
                                 return  a.ordering - b.ordering;
                             });
                     }
+                }
+                if (!this.players[playerName].hasOwnProperty('score')) {
+                    $.post('tableState.php',
+                            {
+                                action: 'addPlayer',
+                                room: this.room,
+                                player: playerName,
+                                type: 'player',
+                                // storing score in image_url
+                                image_url: '0',
+                                ordering: this.playerCount
+                            },
+                            function (data) {
+                                self.lastUpdateId = data.last_update_id;
+                            },
+                            'json');
                 }
             }
         }
@@ -356,17 +414,25 @@ function TableData() {
             i = 0;
         for (var playerName in this.players) {
             if (this.players.hasOwnProperty(playerName)) {
-                this.players[playerName].order = i;
-                if (this.players[playerName] == this.player) {
-                    var difference = i;
+                if (this.players[playerName].cardCount > 0 ||
+                    this.players[playerName].markers.length > 0) {
+                    playerArray.push(this.players[playerName]);
                 }
-                i += 1;
-                playerArray.push(this.players[playerName]);
+            }
+        }
+        playerArray.sort(function (a, b) {
+            return a.ordering - b.ordering;
+        });
+        for (i = 0; i < playerArray.length; i++) {
+            if (playerArray[i].name === this.playerName) {
+                var frontPlayers = playerArray.splice(0, i);
+                playerArray = playerArray.concat(frontPlayers);
+                break;
             }
         }
         for (i = 0; i < playerArray.length; i++) {
-            playerArray[i].order = (playerArray[i].order - difference) % playerArray.length;
-        };
+            playerArray[i].order = i;
+        }
         return playerArray;
     };
 }
@@ -497,8 +563,8 @@ function PlayAreaSVG() {
                 markerText = drugObject.select('text');
             markerRect.attr('x', d.x)
                 .attr('y', d.y);
-            markerText.attr('x', d.x + 2)
-                .attr('y', d.y + 18);
+            markerText.attr('x', d.x + 3)
+                .attr('y', d.y + 26);
         } else {
             drugObject.attr('x', d.x)
                 .attr('y', d.y)
@@ -540,6 +606,7 @@ function PlayAreaSVG() {
                             self.tableData.processRoomState(data);
                             self._drawCards();
                             self.drawMarkers();
+                            self.drawScoreBoard();
                         }
                         self.updateFromServer();
                     },
@@ -860,6 +927,44 @@ function PlayAreaSVG() {
             }
         });
     };
+    this.drawScoreBoard = function () {
+        var playerArray = this.tableData.getPlayerArray();
+
+        var players = d3.select('#scoreBoard').selectAll('tr')
+            .data(playerArray,
+                  function (d) { return d.name; });
+        var newPlayers = players.enter().append('tr');
+
+        newPlayers.append('td').html(function (d) { return d.name; });
+        newPlayers.append('td').append('button')
+            .classed('decrementScore', true)
+            .html('-')
+            .on('click', function (d) {
+                d.score -= 1;
+                self.tableData.updatePlayerScore(d.name, d.score);
+            });
+        newPlayers.append('td').append('input')
+            .classed('score', true)
+            .attr('size', 1)
+            .on('input', function (d) {
+                d.score = this.value;
+                self.tableData.updatePlayerScore(d.name, d.score);
+            });
+        newPlayers.append('td').append('button')
+            .classed('decrementScore', true)
+            .html('+')
+            .on('click', function (d) {
+                d.score += 1;
+                self.tableData.updatePlayerScore(d.name, d.score);
+            });
+
+        players.selectAll('.score')
+            .attr('value', function (d) {
+                return d.score;
+            });
+
+        players.exit().remove();
+    };
     this.drawMarkers = function () {
         var playerArray = this.tableData.getPlayerArray();
         var players = d3.select('#markers').selectAll('g')
@@ -867,8 +972,8 @@ function PlayAreaSVG() {
                   function (d) { return d.name; });
         players.enter().append('g');
         players
-            .attr('transform', function (d) {
-                d.rotation = 360 / playerArray.length * d.order;
+            .attr('transform', function (d, i) {
+                d.rotation = 360 / playerArray.length * i;
                 d.yOffset = -300 * (playerArray.length);
 
                 return 'rotate(' + d.rotation + ' 100 ' + d.yOffset + ')';
@@ -896,14 +1001,17 @@ function PlayAreaSVG() {
                 return d.text;
             })
             .style('font-size', function (d) {
-                var size = 1 / self.scale;
+                var size = 1.5;
+                // var size = 1 / self.scale;
                 return size + 'em';
             })
             .attr('x', function (d) {
-                return d.x + 2;
+                return d.x + 3;
+                // return d.x + (2 / self.scale);
             })
             .attr('y', function (d) {
-                return d.y + 18;
+                return d.y + 26;
+                // return d.y + (18 / self.scale);
             });
 
         markers.each(function (d) {
@@ -1120,9 +1228,15 @@ $(document).ready(function initialSetup() {
     $('#setRoom').on('click', function setRoom() {
         mainApp.playAreaSVG.tableData.setRoom($('#roomName').val());
     });
-    $('#setName').on('click', function setPlayer() {
+    $('#setPlayer').on('click', function setPlayer() {
         mainApp.playAreaSVG.tableData.setPlayer($('#playerName').val());
         mainApp.playAreaSVG._drawCards();
+        mainApp.playAreaSVG.drawMarkers();
+    });
+    $('#setName').on('click', function setPlayer() {
+        mainApp.playAreaSVG.tableData.setName($('#playerName').val());
+        mainApp.playAreaSVG._drawCards();
+        mainApp.playAreaSVG.drawMarkers();
     });
     $('#createMarker').on('click', function setPlayer() {
         mainApp.playAreaSVG.tableData.createMarker($('#markerText').val());
