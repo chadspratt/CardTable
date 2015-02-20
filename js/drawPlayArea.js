@@ -1,5 +1,9 @@
 /*global $ */
-var mainApp;
+var mainApp,
+    deckDealPoint = {
+        x: 100,
+        y: 100
+    };
 
 function Player(name) {
     'use strict';
@@ -180,7 +184,7 @@ function TableData() {
                     },
                     'json');
         }
-    }
+    };
     this._dbRemovePlayerObjects = function () {
         if (this.room !== null && this.player !== null) {
             $.post('tableState.php',
@@ -194,7 +198,7 @@ function TableData() {
                     },
                     'json');
         }
-    }
+    };
 
     this.processRoomState = function (newData) {
         // clear old data
@@ -327,21 +331,39 @@ function TableData() {
                            [newMarker],
                            'ontop');
     };
-    this.clearMarkers = function () {
-        this.player.markers = [];
-    };
-    this.resetDeck = function () {
-        for (zone in this.player.zones) {
-            if (this.player.zones.hasOwnProperty(zone) &&
-                    zone !== 'deck') {
-                this.player.zones['deck'].cards.concat(this.player.zones[zone].cards);
-                this.player.zones[zone].cards = [];
+    this.resetPlayer = function () {
+        var deckCards = this.player.zones['deck'].cards;
+        for (var zoneName in this.player.zones) {
+            if (this.player.zones.hasOwnProperty(zoneName) &&
+                zoneName !== 'deck') {
+                var zoneCards = this.player.zones[zoneName].cards;
+
+                for (var i = 0; i < zoneCards.length; i++) {
+                    zoneCards[i].zone = 'deck';
+                    zoneCards[i].x = deckDealPoint.x;
+                    zoneCards[i].y = deckDealPoint.y;
+                    zoneCards[i].rotation = 0;
+                    zoneCards[i].ordering = 0;
+                    deckCards.push(zoneCards[i]);
+                }
+
+                this.player.zones[zoneName].cards = [];
             }
         }
-        $('#deckCount').text(this.player.zones['deck'].length);
-        this.shuffleDeck();
+        this.player.markers = [];
+        $.post('tableState.php',
+                {
+                    action: 'reset_player',
+                    room: this.room,
+                    player: this.player.name,
+                    x: deckDealPoint.x,
+                    y: deckDealPoint.y
+                },
+                function (data) {
+                    self.lastUpdateId = data.last_update_id;
+                },
+                'json');
     };
-
     this.shuffleDeck = function () {
         var deck = this.player.zones['deck'].cards;
         for (var i = deck.length - 1; i > 0; i--) {
@@ -669,13 +691,13 @@ function PlayAreaSVG() {
             })
             .attr('x', function (d, i) {
                 if (!d.hasOwnProperty('x')) {
-                    d.x = 100;
+                    d.x = deckDealPoint.x;
                 }
                 return d.x;
             })
             .attr('y', function (d) {
                 if (!d.hasOwnProperty('y')) {
-                    d.y = 100;
+                    d.y = deckDealPoint.y;
                 }
                 return d.y;
             })
@@ -769,7 +791,8 @@ function PlayAreaSVG() {
                     // mousemove removal zone
                     .on('mouseleave', function (d) {
                         if (!self.featureDragging &&
-                            d3.event.toElement.nodeName !== 'rect') {
+                            (!d3.event.hasOwnProperty('toElement') ||
+                             d3.event.toElement.nodeName !== 'rect')) {
                             d3.select(this).remove();
                             d3.select('#cardButtons').html('');
                             self.buttonsDisplayed = false;
@@ -1240,6 +1263,11 @@ $(document).ready(function initialSetup() {
     });
     $('#createMarker').on('click', function setPlayer() {
         mainApp.playAreaSVG.tableData.createMarker($('#markerText').val());
+        mainApp.playAreaSVG.drawMarkers();
+    });
+    $('#resetDeck').on('click', function setPlayer() {
+        mainApp.playAreaSVG.tableData.resetPlayer();
+        mainApp.playAreaSVG._drawCards();
         mainApp.playAreaSVG.drawMarkers();
     });
 });

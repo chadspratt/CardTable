@@ -30,6 +30,14 @@ $updateDeckOrderQuery = $connection->prepare("UPDATE CurrentState SET
                                     ordering = ?
                                     WHERE room = ? AND player = ? AND
                                     id = ? AND zone = 'deck'");
+$resetDeckQuery = $connection->prepare("UPDATE CurrentState SET
+                                    zone = \"deck\", xPos = ?, yPos = ?,
+                                    rotation = 0, ordering = 0
+                                    WHERE room = ? AND player = ? AND
+                                    type = \"card\"");
+$resetMarkersQuery = $connection->prepare("DELETE FROM CurrentState
+                                          WHERE room = ? AND player = ?
+                                          AND type = \"marker\"");
 $removeQuery = $connection->prepare("DELETE FROM CurrentState
                                     WHERE room = ? AND player = ? AND
                                     type = ? AND id = ?");
@@ -209,6 +217,22 @@ else
             $updateDeckOrderQuery->execute();
         }
         $updateDeckOrderQuery->close();
+    }
+    elseif ($_POST["action"] === "reset_player")
+    {
+        $resetDeckQuery->bind_param("iiss",
+                                    $_POST["x"],
+                                    $_POST["y"],
+                                    $_POST["room"],
+                                    $_POST["player"]);
+        $resetDeckQuery->execute();
+        $resetDeckQuery->close();
+
+        $resetMarkersQuery->bind_param("ss",
+                                       $_POST["room"],
+                                       $_POST["player"]);
+        $resetMarkersQuery->execute();
+        $resetMarkersQuery->close();
     }
     elseif ($_POST["action"] === "remove")
     {
