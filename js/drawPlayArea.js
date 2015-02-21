@@ -52,7 +52,6 @@ function TableData() {
                 });
     };
     this.setPlayer = function (playerName) {
-            // check if its a new name
         if (!this.players.hasOwnProperty(playerName)) {
             this.players[playerName] = new Player(playerName);
             this.players[playerName].zones['deck'] = new Zone('deck');
@@ -97,11 +96,13 @@ function TableData() {
     this._dbAddObjects = function (objectType, objects, zone) {
         if (this.room !== null && this.player !== null) {
             var objectIds = [],
+                names = [],
                 imageUrls = [],
                 xPositions = [],
                 yPositions = [];
             for (var i = 0; i < objects.length; i++) {
                 objectIds.push(objects[i].id);
+                names.push(objects[i].name);
                 imageUrls.push(objects[i].image_url);
                 xPositions.push(objects[i].x);
                 yPositions.push(objects[i].y);
@@ -114,6 +115,7 @@ function TableData() {
                         zone: zone,
                         type: objectType,
                         'id[]': objectIds,
+                        'name[]': names,
                         'image_url[]': imageUrls,
                         'x_pos[]': xPositions,
                         'y_pos[]': yPositions
@@ -134,7 +136,6 @@ function TableData() {
                         zone: object.zone,
                         type: object.type,
                         id: object.id,
-                        image_url: object.image_url,
                         x_pos: object.x,
                         y_pos: object.y,
                         rotation: object.rotation,
@@ -224,6 +225,7 @@ function TableData() {
                     zone: object.zone,
                     id: object.id,
                     image_url: object.imageUrl,
+                    name: object.name,
                     x: object.xPos,
                     y: object.yPos,
                     playerName: object.player,
@@ -298,7 +300,7 @@ function TableData() {
             // create extra copies of duplicate cards
             for (var j = 1; j < card.count; j++) {
                 duplicateCards.push({
-                    // NAME: card.NAME,
+                    name: card.name,
                     image_url: card.image_url,
                     count: card.count,
                     id: deck.length + duplicateCards.length,
@@ -382,6 +384,17 @@ function TableData() {
         if (deck.length > 0) {
             this.changeCardZone(deck[deck.length - 1],
                                 'hand');
+        }
+    };
+    this.drawCardById = function (id) {
+        var deck = this.player.zones['deck'].cards,
+            card = null;
+        for (var i = 0; i < deck.length; i++) {
+            if (deck[i].id == id) {
+                this.changeCardZone(deck[i],
+                                    'hand');
+                break;
+            }
         }
     };
     this.changeCardZone = function (card, targetZone, end) {
@@ -479,7 +492,8 @@ function PlayAreaSVG() {
     this.scale = 1;
     this.boundary = null;
     this.featureIconSize = 15;
-    this.needUpdate = false;
+    this.noChangesCount = 0;
+    this.sleeping = true;
     this.featureClicked = false;
     this.featureDragging = false;
     self.buttonsDisplayed = false;
@@ -613,10 +627,13 @@ function PlayAreaSVG() {
         } else {
             self.tableData.dbUpdateObject(d);
         }
+        self.updateFromServer();
     });
 
     this.updateFromServer = function () {
-        if (this.tableData.room !== null) {
+        if (this.tableData.room !== null
+            & this.sleeping) {
+            this.sleeping = false;
             $.post('tableState.php',
                     {
                         action: 'get_state',
@@ -625,12 +642,21 @@ function PlayAreaSVG() {
                     },
                     function (data) {
                         if (!data.hasOwnProperty('no_changes')) {
+                            self.noChangesCount = 0;
                             self.tableData.processRoomState(data);
                             self._drawCards();
                             self.drawMarkers();
                             self.drawScoreBoard();
+                        } else {
+                            self.noChangesCount += 1;
                         }
-                        self.updateFromServer();
+                        // sleep after 20 minutes of inactivity
+                        // wake by dragging a card
+                        // XXX mention all this somewhere on the page
+                        self.sleeping = true;
+                        if (self.noChangesCount < 20) {
+                            self.updateFromServer();
+                        }
                     },
                     'json')
             .fail(function () {
@@ -642,6 +668,11 @@ function PlayAreaSVG() {
         this.tableData.drawCard();
         this._drawCards();
     };
+    this.drawSelectedCard = function () {
+        var selectedCardId = d3.select('#deckList').property('value');
+        this.tableData.drawCardById(selectedCardId);
+        this._drawCards();
+    };
     this._drawCards = function () {
         d3.select('#cardButtons').selectAll("*").remove();
 
@@ -649,6 +680,7 @@ function PlayAreaSVG() {
         if (currentPlayer.zones.hasOwnProperty('deck')) {
             $('#deckCount').text(currentPlayer.zones['deck'].cards.length);
         }
+        this.drawDeckList();
 
         var playerArray = this.tableData.getPlayerArray();
         this.playerRotationPoint = {x: 100,
@@ -988,6 +1020,50 @@ function PlayAreaSVG() {
 
         players.exit().remove();
     };
+    this.drawDeckList = function () {
+        var deck = this.tableData.player.zones['deck'].cards,
+            sortedDeck = [];
+
+        for (var i = 0; i < deck.length; i++) {
+            sortedDeck.push({
+                    type: deck[i].type,
+                    zone: deck[i].zone,
+                    id: deck[i].id,
+                    image_url: deck[i].image_url,
+                    name: deck[i].name,
+                    x: deck[i].x,
+                    y: deck[i].y,
+                    playerName: deck[i].playerName,
+                    rotation: deck[i].rotation,
+                    ordering: deck[i].ordering
+                });
+        }
+        sortedDeck.sort(function (a, b) {
+            // if (a.id < b.id) {
+            if (a.name < b.name) {
+                return -1;
+            // } else if (a.id > b.id) {
+            } else if (a.name > b.name) {
+                return 1;
+            } else {
+                return 0;
+            }
+        });
+
+        var cards = d3.select('#deckList').selectAll('option')
+            .data(sortedDeck,
+                  function (d) { return d.id; });
+        cards.enter().append('option')
+            .attr('value', function (d) {
+                return d.id;
+            })
+            .html(function (d) {
+                // return d.id;
+                return d.name;
+            });
+
+        cards.exit().remove();
+    };
     this.drawMarkers = function () {
         var playerArray = this.tableData.getPlayerArray();
         var players = d3.select('#markers').selectAll('g')
@@ -1233,6 +1309,10 @@ $(document).ready(function initialSetup() {
                                   mainApp.playAreaSVG.svgHeight / 2);
     });
 
+    $('#deckListBox').hide();
+    $('#showDeckList').on('click', function showLoadDeckForm() {
+        $('#deckListBox').toggle();
+    });
     $('#loadDeckForm').hide();
     $('#loadDeckHeader').on('click', function showLoadDeckForm() {
         $('#loadDeckForm').toggle();
@@ -1247,6 +1327,9 @@ $(document).ready(function initialSetup() {
     });
     $('#drawCard').on('click', function drawCard() {
         mainApp.playAreaSVG.drawCard();
+    });
+    $('#drawSelectedCard').on('click', function drawCard() {
+        mainApp.playAreaSVG.drawSelectedCard();
     });
     $('#setRoom').on('click', function setRoom() {
         mainApp.playAreaSVG.tableData.setRoom($('#roomName').val());

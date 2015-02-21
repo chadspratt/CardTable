@@ -55,15 +55,18 @@
   <div id="deckBox" class="overlayItem inline">
     <H2>Deck (<span id="deckCount">0</span> cards)</H2>
     <button id="drawCard">Draw</button>
+    <button id="showDeckList">List</button>
     <button id="shuffleDeck">Shuffle</button>
     <button id="resetDeck">Reset</button>
-    <div>
-      <div id="loadDeckBox" class="overlayItem inline">
-        <div id="loadDeckForm">
-          <textarea type="text" id="deckCSV" value="" rows="10" cols="50"></textarea>
-          <button id="loadDeck">Load</button>
-        </div>
-        <div id="loadDeckHeader" class="links">Load From CSV</div>
+    <div id="deckListBox">
+      <select id="deckList" size="15"></select>
+      <div><button id="drawSelectedCard">Draw Selected</button></div>
+    </div>
+    <div id="loadDeckBox">
+      <div id="loadDeckHeader" class="links">Load From CSV</div>
+      <div id="loadDeckForm">
+        <textarea type="text" id="deckCSV" value="" rows="10" cols="25"></textarea>
+        <div><button id="loadDeck">Load</button></div>
       </div>
     </div>
   </div>

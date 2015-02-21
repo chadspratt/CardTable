@@ -4,13 +4,14 @@ session_start();
 require_once "../../db_connect/cards.inc";
 
 $connection = GetDatabaseConnection();
-$getStateQuery = $connection->prepare("SELECT player, zone, type, id, imageUrl,
-                                      xPos, yPos, rotation, ordering FROM CurrentState
+$getStateQuery = $connection->prepare("SELECT player, zone, type, id, name,
+                                      imageUrl, xPos, yPos, rotation, ordering
+                                      FROM CurrentState
                                       WHERE room = ?");
 $addQuery = $connection->prepare("INSERT INTO CurrentState
-                                 (room, player, zone, type, id,
+                                 (room, player, zone, type, id, name,
                                  imageUrl, xPos, yPos)
-                                 SELECT ?, ?, ?, ?, ?, ?, ?, ?");
+                                 SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?");
 $addPlayerQuery = $connection->prepare("INSERT INTO CurrentState
                                  (room, player, type, imageUrl)
                                  SELECT ?, ?, ?, ?");
@@ -114,7 +115,7 @@ if ($_POST["action"] === "get_state")
 
     $getStateQuery->bind_param("s", $_POST["room"]);
     $getStateQuery->execute();
-    $getStateQuery->bind_result($player, $zone, $type, $id, $imageUrl,
+    $getStateQuery->bind_result($player, $zone, $type, $id, $name, $imageUrl,
                                 $xPos, $yPos, $rotation, $ordering);
     $results = [];
     while ($getStateQuery->fetch())
@@ -124,6 +125,7 @@ if ($_POST["action"] === "get_state")
             "zone" => $zone,
             "type" => $type,
             "id" => $id,
+            "name" => $name,
             "imageUrl" => $imageUrl,
             "xPos" => $xPos,
             "yPos" => $yPos,
@@ -149,12 +151,13 @@ else
     {
         for ($i=0; $i < count($_POST["id"]); $i++)
         {
-            $addQuery->bind_param("ssssisii",
+            $addQuery->bind_param("ssssissii",
                                   $_POST["room"],
                                   $_POST["player"],
                                   $_POST["zone"],
                                   $_POST["type"],
                                   $_POST["id"][$i],
+                                  $_POST["name"][$i],
                                   $_POST["image_url"][$i],
                                   $_POST["x_pos"][$i],
                                   $_POST["y_pos"][$i]);

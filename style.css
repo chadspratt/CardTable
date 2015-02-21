@@ -24,6 +24,9 @@ body {
     left: 10px;
     max-width: 400px;
 }
+#deckList {
+    min-width: 200px;
+}
 #coordDisplay {
     position: absolute;
     left: 10px;
