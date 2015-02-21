@@ -1051,8 +1051,9 @@ function PlayAreaSVG() {
         });
 
         var cards = d3.select('#deckList').selectAll('option')
-            .data(sortedDeck,
-                  function (d) { return d.id; });
+            .data(sortedDeck, function (d) {
+                   return d.playerName + d.id;
+               });
         cards.enter().append('option')
             .attr('value', function (d) {
                 return d.id;
@@ -1338,11 +1339,13 @@ $(document).ready(function initialSetup() {
         mainApp.playAreaSVG.tableData.setPlayer($('#playerName').val());
         mainApp.playAreaSVG._drawCards();
         mainApp.playAreaSVG.drawMarkers();
+        mainApp.playAreaSVG.drawDeckList();
     });
     $('#setName').on('click', function setPlayer() {
         mainApp.playAreaSVG.tableData.setName($('#playerName').val());
         mainApp.playAreaSVG._drawCards();
         mainApp.playAreaSVG.drawMarkers();
+        mainApp.playAreaSVG.drawDeckList();
     });
     $('#createMarker').on('click', function setPlayer() {
         mainApp.playAreaSVG.tableData.createMarker($('#markerText').val());
@@ -1352,5 +1355,6 @@ $(document).ready(function initialSetup() {
         mainApp.playAreaSVG.tableData.resetPlayer();
         mainApp.playAreaSVG._drawCards();
         mainApp.playAreaSVG.drawMarkers();
+        mainApp.playAreaSVG.drawDeckList();
     });
 });
