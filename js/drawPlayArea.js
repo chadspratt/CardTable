@@ -50,6 +50,7 @@ function TableData() {
                     action: 'change_room',
                     room: this.room
                 });
+        mainApp.updateFromServer();
     };
     this.setPlayer = function (playerName) {
         if (!this.players.hasOwnProperty(playerName)) {
@@ -246,7 +247,7 @@ function TableData() {
                 }
             } else if (object.type === 'player') {
                 player.score = parseInt(object.rotation);
-                player.ordering = object.ordering;
+                player.ordering = parseInt(object.ordering);
             }
         }
         for (var playerName in this.players) {
@@ -491,7 +492,8 @@ function PlayAreaSVG() {
 
     this.scale = 1;
     this.boundary = null;
-    this.featureIconSize = 15;
+    this.markerSize = 3;
+    this.cardSize = 1;
     this.noChangesCount = 0;
     this.sleeping = true;
     this.featureClicked = false;
@@ -514,8 +516,6 @@ function PlayAreaSVG() {
         this.tableData = new TableData();
         this.tableData.setRoom($('#roomName').val());
         this.tableData.setPlayer($('#playerName').val());
-
-        this.updateFromServer();
     };
 
     this.drag = d3.behavior.drag();
@@ -523,17 +523,19 @@ function PlayAreaSVG() {
         self.featureDragging = true;
         self.dragOffset = {x: null,
                            y: null};
-        d3.event.sourceEvent.stopPropagation(); // silence other listeners
+        d3.event.sourceEvent.stopPropagation();
         var drugObject = d3.select(this),
             parent = d3.select($(this).parent()[0]);
         if (drugObject.classed('enlarged')) {
             d.clicked = true;
-            drugObject.attr('x', d.x)
-                .attr('y', d.y)
-                .attr('height', d.height)
-                .attr('width', d.width);
-            drugObject = d.originCard;
-            parent = d3.select($(d.originCard[0]).parent()[0]);
+            // drugObject.attr('x', d.x)
+            //     .attr('y', d.y)
+            //     .attr('height', d.height)
+            //     .attr('width', d.width);
+            // drugObject = d.originCard;
+            drugObject = d3.select('[player="' + d.playerName + '"]' +
+                                   '[card_id="' + d.id + '"]')
+            parent = d3.select($(drugObject[0][0]).parent()[0]);
         }
         // put the card on top of other cards in its group
         var newOrdering = 0,
@@ -552,6 +554,8 @@ function PlayAreaSVG() {
         });
     });
     this.drag.on('drag', function (d) {
+        // d3.event.sourceEvent.stopPropagation();
+        d3.select('#cardButtons').selectAll("*").remove();
         d.clicked = false;
         var drugObject = d3.select(this);
         if (self.dragOffset.x === null) {
@@ -563,21 +567,23 @@ function PlayAreaSVG() {
             };
         }
 
+        // move the card
         d.x = d3.event.x + self.dragOffset.x;
         d.y = d3.event.y + self.dragOffset.y;
 
         $('#motionDisplay').html('dx: ' + d3.event.dx + ' dy: ' + d3.event.dy);
         mainApp.setCoordDisplay(d3.event.x, d3.event.y);
+
         if (drugObject.classed('enlarged')) {
-            drugObject.attr('opacity', '0.0');
+            drugObject.style('opacity', '0.0');
             // d.originCard.attr('opacity', '0.0');
 
             d.enlargedX = d3.event.x + self.dragOffset.enlargedX;
             d.enlargedY = d3.event.y + self.dragOffset.enlargedY;
 
             drugObject
-                .attr('x', d.x)
-                .attr('y', d.y)
+                .attr('x', d.enlargedX)
+                .attr('y', d.enlargedY)
                 .attr('transform', function (d) {
                     var imgCenterX = d.x + d.width / 2,
                         imgCenterY = d.y + d.height / 2,
@@ -588,12 +594,11 @@ function PlayAreaSVG() {
                 });
 
             // move source card beneath it too
-            drugObject = d.originCard;
+            // drugObject = d.originCard;
+            drugObject = d3.select('[player="' + d.playerName + '"]' +
+                                   '[card_id="' + d.id + '"]')
         }
 
-        // move the card
-        d.x = d3.event.x + self.dragOffset.x;
-        d.y = d3.event.y + self.dragOffset.y;
         if (drugObject.classed('marker')) {
             var markerRect = drugObject.select('rect'),
                 markerText = drugObject.select('text');
@@ -615,55 +620,14 @@ function PlayAreaSVG() {
         self.featureDragging = false;
         var drugObject = d3.select(this);
         if (drugObject.classed('enlarged')) {
-            // d.originCard.attr('opacity', '1.0');
-            if (!d.clicked) {
-                self.tableData.dbUpdateObject(d.originCard.data()[0]);
-            } else {
-                drugObject.attr('x', d.enlargedX)
-                    .attr('y', d.enlargedY)
-                    .attr('height', d.enlargedHeight)
-                    .attr('width', d.enlargedWidth);
-            }
-        } else {
+            drugObject.style('opacity', '1.0');
+            d.originCard
+        }
+        if (!d.clicked) {
             self.tableData.dbUpdateObject(d);
         }
-        self.updateFromServer();
+        mainApp.updateFromServer();
     });
-
-    this.updateFromServer = function () {
-        if (this.tableData.room !== null
-            & this.sleeping) {
-            this.sleeping = false;
-            $.post('tableState.php',
-                    {
-                        action: 'get_state',
-                        room: this.tableData.room,
-                        last_update_id: this.tableData.lastUpdateId
-                    },
-                    function (data) {
-                        if (!data.hasOwnProperty('no_changes')) {
-                            self.noChangesCount = 0;
-                            self.tableData.processRoomState(data);
-                            self._drawCards();
-                            self.drawMarkers();
-                            self.drawScoreBoard();
-                        } else {
-                            self.noChangesCount += 1;
-                        }
-                        // sleep after 20 minutes of inactivity
-                        // wake by dragging a card
-                        // XXX mention all this somewhere on the page
-                        self.sleeping = true;
-                        if (self.noChangesCount < 20) {
-                            self.updateFromServer();
-                        }
-                    },
-                    'json')
-            .fail(function () {
-                // self.updateFromServer();
-            });
-        }
-    };
     this.drawCard = function () {
         this.tableData.drawCard();
         this._drawCards();
@@ -674,7 +638,7 @@ function PlayAreaSVG() {
         this._drawCards();
     };
     this._drawCards = function () {
-        d3.select('#cardButtons').selectAll("*").remove();
+        // d3.select('#cardButtons').selectAll("*").remove();
 
         var currentPlayer = this.tableData.player;
         if (currentPlayer.zones.hasOwnProperty('deck')) {
@@ -713,6 +677,12 @@ function PlayAreaSVG() {
                   function (d) { return d.id; });
 
         cards.enter().append('image')
+            .attr('player', function (d) {
+                return d.playerName;
+            })
+            .attr('card_id', function (d) {
+                return d.id;
+            })
             .attr('xlink:href', function (d) {
                 if (d.zone !== 'hand' ||
                     d.playerName === self.tableData.playerName) {
@@ -755,239 +725,254 @@ function PlayAreaSVG() {
         cards.sort(function (a, b) {
             return a.ordering - b.ordering;
         });
-        cards.on('mousemove', function showEnlargedCard(d) {
-            var originCard = d3.select(this);
-            d.originCard = originCard;
-
-            if (self.scale < 0.8 &&
-                !self.featureDragging &&
-                (d.playerName === self.tableData.playerName ||
-                 d.zone !== 'hand')) {
-                var player = d3.select(d.originCard[0][0].parentNode.parentNode),
-                    enlargedCardZone = d3.select('#enlargedCard');
-                enlargedCardZone
-                    .attr('transform', function (d) {
-                        return player.attr('transform');
-                    });
-                var newCardData = enlargedCardZone.selectAll('image')
-                        .data([d], function (d) {return d.image_url; }),
-                    player = d3.select(d.originCard[0][0].parentNode.parentNode);
-                mainApp.enlargedCard = newCardData.enter().append('image');
-                mainApp.enlargedCard
-                    .classed('enlarged', true)
-                    .attr('transform', function (d) {
-                        var imgCenterX = d.x + d.width / 2,
-                            imgCenterY = d.y + d.height / 2,
-                            rotation = -1 * self.playerRotations[d.playerName].degrees;
-                        return 'rotate(' + rotation + ' ' +
-                                           imgCenterX + ' ' +
-                                           imgCenterY + ')';
-                    })
-                    .attr('xlink:href', function (d) {
-                        return d.image_url;
-                    })
-                    .attr('x', function (d) {
-                        d.enlargedX = d.x + (d.width * self.scale - d.width) / (2 * self.scale);
-                        return d.enlargedX;
-                    })
-                    .attr('y', function (d) {
-                        d.enlargedY = d.y + (d.height * self.scale - d.height) / (2 * self.scale);
-                        return d.enlargedY;
-                    })
-                    .attr('width', function (d) {
-                        d.enlargedWidth = d.width / self.scale;
-                        return d.enlargedWidth;
-                    })
-                    .attr('height', function (d) {
-                        d.enlargedHeight = d.height / self.scale;
-                        return d.enlargedHeight;
-                    })
-                    .on('mousemove', function (d) {
-                        var svgCoords = self.getSVGCoordinates(d3.event.x,
-                                                               d3.event.y);
-                        mainApp.setCoordDisplay(d3.event.x, d3.event.y);
-                        // XXX need to rotate d.x and y for this to work for
-                        // rotated cards
-                        if (self.tableData.playerName === d.playerName &&
-                            !self.buttonsDisplayed) {
-                            if (svgCoords.x < d.x ||
-                                svgCoords.x > d.x + d.width ||
-                                svgCoords.y < d.y ||
-                                svgCoords.y > d.y + d.height)
-                            {
-                                d3.select(this).remove();
-                            }
-                        }
-                    })
-                    // backup in case the mouse doesn't get caught in the
-                    // mousemove removal zone
-                    .on('mouseleave', function (d) {
-                        if (!self.featureDragging &&
-                            (!d3.event.hasOwnProperty('toElement') ||
-                             d3.event.toElement.nodeName !== 'rect')) {
-                            d3.select(this).remove();
-                            d3.select('#cardButtons').html('');
-                            self.buttonsDisplayed = false;
-                        }
-                    })
-                mainApp.enlargedCard.call(self.drag);
-                newCardData.exit().remove();
-
-                mainApp.enlargedCard.on('click', function showCardButtons(d) {
-                    if(!d.clicked ||
-                       self.tableData.playerName !== d.playerName)
-                    {
-                        return;
-                    }
-                    self.buttonsDisplayed = true;
-                    // show buttons for own cards
-                    var card = d;
-                    // x/y/width/height are percentages of enlarged card width
-                    var buttonData = {
-                        rotateLeft: {
-                            text: 'L',
-                            x: 10,
-                            y: 20,
-                            width: 10,
-                            height: 10
-                        },
-                        rotateRight: {
-                            text: 'R',
-                            x: 80,
-                            y: 20,
-                            width: 10,
-                            height: 10
-                        },
-                        play: {
-                            text: 'Play',
-                            x: 30,
-                            y: 20,
-                            width: 40,
-                            height: 10
-                        },
-                        hand: {
-                            text: 'Hand',
-                            x: 30,
-                            y: 20,
-                            width: 40,
-                            height: 10
-                        },
-                        deckBottom: {
-                            text: 'B',
-                            x: 10,
-                            y: 35,
-                            width: 10,
-                            height: 10
-                        },
-                        deck: {
-                            text: 'Deck',
-                            x: 30,
-                            y: 35,
-                            width: 40,
-                            height: 10
-                        },
-                        deckTop: {
-                            text: 'T',
-                            x: 80,
-                            y: 35,
-                            width: 10,
-                            height: 10
-                        }
-                    },
-                        buttons = [];
-
-                    if (d.zone === 'hand') {
-                        buttons = [
-                            buttonData.play,
-                            buttonData.deckTop,
-                            buttonData.deck,
-                            buttonData.deckBottom
-                        ];
-                    } else if (d.zone === 'inPlay') {
-                        buttons = [
-                            buttonData.rotateLeft,
-                            buttonData.hand,
-                            buttonData.rotateRight,
-                            buttonData.deckTop,
-                            buttonData.deck,
-                            buttonData.deckBottom
-                        ];
-                    }
-
-                    d3.select('#cardButtons').selectAll("*").remove();
-
-                    var cardButtons = d3.select('#cardButtons').selectAll('g')
-                        .data(buttons, function (d) { return d.text });
-                    cardButtons.enter().append('g')
-                        .classed('button', true)
-                        .on('click', function (d) {
-                            if (d.text === 'L') {
-                                self.tableData.rotateLeft(card);
-                                self._drawCards();
-                            } else if (d.text === 'R') {
-                                self.tableData.rotateRight(card);
-                                self._drawCards();
-                            } else if (d.text === 'T') {
-                                self.tableData.changeCardZone(card,
-                                                              'deck',
-                                                              'top');
-                                self._drawCards();
-                            } else if (d.text === 'B') {
-                                self.tableData.changeCardZone(card,
-                                                              'deck',
-                                                              'bottom');
-                                self._drawCards();
-                            } else if (d.text === 'Play') {
-                                self.tableData.changeCardZone(card,
-                                                              'inPlay');
-                                self._drawCards();
-                            } else if (d.text === 'Hand') {
-                                self.tableData.changeCardZone(card,
-                                                              'hand');
-                                self._drawCards();
-                            }
-                            d3.select('#cardButtons').selectAll("*").remove();
-                            d3.select('#enlargedCard').selectAll("*").remove();
-                        });
-                    cardButtons.append('rect')
-                        .attr('x', function (d) {
-                            return card.enlargedX + card.enlargedWidth / 100 * d.x;
-                        })
-                        .attr('y', function (d) {
-                            return card.enlargedY + card.enlargedWidth / 100 * d.y;
-                        })
-                        .attr('width', function (d) {
-                            return card.enlargedWidth / 100 * d.width;
-                        })
-                        .attr('height', function (d) {
-                            return card.enlargedWidth / 100 * d.height;
-                        })
-                        .attr('rx', 5)
-                        .attr('ry', 5);
-                    cardButtons.append('text')
-                        .html(function (d) {
-                            return d.text;
-                        })
-                        .style('font-size', function (d) {
-                            var size = 1 / self.scale
-                            return size + 'em';
-                        })
-                        .attr('x', function (d) {
-                            return card.enlargedX + card.enlargedWidth / 100 * (d.x + 2);
-                        })
-                        .attr('y', function (d) {
-                            return card.enlargedY + card.enlargedWidth / 100 * (d.y + 7);
-                        });
-                });
-            }
-        });
+        cards.on('click.enlarge', self.showEnlargedCard);
+        cards.on('click.buttons', self.showCardButtons);
+        //          function (d) {
+        //     var clickedCard = d3.select(this);
+        //     clickedCard.call(self.showEnlargedCard(d));
+        //     clickedCard.call(self.showCardButtons(d));
+        // });
     };
+    this.showEnlargedCard = function (d) {
+        d3.event.stopPropagation(); // silence other listeners
+        var originCard = d3.select(this);
+        d.originCard = originCard;
+
+        if (self.scale < 0.8 &&
+            !self.featureDragging &&
+            (d.playerName === self.tableData.playerName ||
+             d.zone !== 'hand')) {
+            var enlargedScale = self.scale / self.cardSize,
+                enlargedCardZone = d3.select('#enlargedCard'),
+                player = d3.select(d.originCard[0][0].parentNode.parentNode);
+
+            enlargedCardZone
+                .attr('transform', function (d) {
+                    return player.attr('transform');
+                });
+            var newCardData = enlargedCardZone.selectAll('image')
+                    .data([d], function (d) {return d.image_url; });
+            mainApp.enlargedCard = newCardData.enter().append('image');
+            mainApp.enlargedCard
+                .classed('enlarged', true)
+                .attr('transform', function (d) {
+                    var imgCenterX = d.x + d.width / 2,
+                        imgCenterY = d.y + d.height / 2,
+                        rotation = -1 * self.playerRotations[d.playerName].degrees;
+                    return 'rotate(' + rotation + ' ' +
+                                       imgCenterX + ' ' +
+                                       imgCenterY + ')';
+                })
+                .attr('xlink:href', function (d) {
+                    return d.image_url;
+                })
+                .attr('x', function (d) {
+                    d.enlargedX = d.x + (d.width * enlargedScale - d.width) / (2 * enlargedScale);
+                    return d.enlargedX;
+                })
+                .attr('y', function (d) {
+                    d.enlargedY = d.y + (d.height * enlargedScale - d.height) / (2 * enlargedScale);
+                    return d.enlargedY;
+                })
+                .attr('width', function (d) {
+                    d.enlargedWidth = d.width / enlargedScale;
+                    return d.enlargedWidth;
+                })
+                .attr('height', function (d) {
+                    d.enlargedHeight = d.height / enlargedScale;
+                    return d.enlargedHeight;
+                });
+                // .on('mousemove', function (d) {
+                //     var svgCoords = self.getSVGCoordinates(d3.event.x,
+                //                                            d3.event.y);
+                //     mainApp.setCoordDisplay(d3.event.x, d3.event.y);
+                //     // XXX need to rotate d.x and y for this to work for
+                //     // rotated cards
+                //     // if (self.tableData.playerName === d.playerName &&
+                //     //     !self.buttonsDisplayed) {
+                //     //     if (svgCoords.x < d.x ||
+                //     //         svgCoords.x > d.x + d.width ||
+                //     //         svgCoords.y < d.y ||
+                //     //         svgCoords.y > d.y + d.height)
+                //     //     {
+                //     //         d3.select(this).remove();
+                //     //     }
+                //     // }
+                // })
+                // backup in case the mouse doesn't get caught in the
+                // mousemove removal zone
+                // .on('mouseleave', function (d) {
+                //     if (!self.featureDragging &&
+                //         (d3.event.toElement !== null &&
+                //          d3.event.toElement.nodeName !== 'rect')) {
+                //         // d3.select(this).remove();
+                //         // d3.select('#cardButtons').html('');
+                //         // self.buttonsDisplayed = false;
+                //     }
+                // })
+            mainApp.enlargedCard.call(self.drag);
+            newCardData.exit().remove();
+
+            // mainApp.enlargedCard.on('click.enlarge', self.showEnlargedCard);
+            mainApp.enlargedCard.on('click.enlarge', function () {
+                d3.event.stopPropagation();
+            });
+            mainApp.enlargedCard.on('click.buttons', self.showCardButtons);
+            // });
+        }
+    };
+    this.showCardButtons = function (d) {
+        d3.event.stopPropagation(); // silence other listeners
+        d3.select('#cardButtons').selectAll("*").remove();
+        if(self.tableData.playerName === d.playerName)
+        {
+            self.buttonsDisplayed = true;
+            // show buttons for own cards
+            var card = d;
+            // x/y/width/height are percentages of enlarged card width
+            var buttonData = {
+                rotateLeft: {
+                    text: 'L',
+                    x: 10,
+                    y: 20,
+                    width: 10,
+                    height: 10
+                },
+                rotateRight: {
+                    text: 'R',
+                    x: 80,
+                    y: 20,
+                    width: 10,
+                    height: 10
+                },
+                play: {
+                    text: 'Play',
+                    x: 30,
+                    y: 20,
+                    width: 40,
+                    height: 10
+                },
+                hand: {
+                    text: 'Hand',
+                    x: 30,
+                    y: 20,
+                    width: 40,
+                    height: 10
+                },
+                deckBottom: {
+                    text: 'B',
+                    x: 10,
+                    y: 35,
+                    width: 10,
+                    height: 10
+                },
+                deck: {
+                    text: 'Deck',
+                    x: 30,
+                    y: 35,
+                    width: 40,
+                    height: 10
+                },
+                deckTop: {
+                    text: 'T',
+                    x: 80,
+                    y: 35,
+                    width: 10,
+                    height: 10
+                }
+            },
+                buttons = [];
+
+            if (d.zone === 'hand') {
+                buttons = [
+                    buttonData.play,
+                    buttonData.deckTop,
+                    buttonData.deck,
+                    buttonData.deckBottom
+                ];
+            } else if (d.zone === 'inPlay') {
+                buttons = [
+                    buttonData.rotateLeft,
+                    buttonData.hand,
+                    buttonData.rotateRight,
+                    buttonData.deckTop,
+                    buttonData.deck,
+                    buttonData.deckBottom
+                ];
+            }
+
+            var cardButtons = d3.select('#cardButtons').selectAll('g')
+                .data(buttons, function (d) { return d.text });
+            cardButtons.enter().append('g')
+                .classed('button', true)
+                .on('click', function (d) {
+                    if (d.text === 'L') {
+                        self.tableData.rotateLeft(card);
+                        self._drawCards();
+                    } else if (d.text === 'R') {
+                        self.tableData.rotateRight(card);
+                        self._drawCards();
+                    } else if (d.text === 'T') {
+                        self.tableData.changeCardZone(card,
+                                                      'deck',
+                                                      'top');
+                        self._drawCards();
+                    } else if (d.text === 'B') {
+                        self.tableData.changeCardZone(card,
+                                                      'deck',
+                                                      'bottom');
+                        self._drawCards();
+                    } else if (d.text === 'Play') {
+                        self.tableData.changeCardZone(card,
+                                                      'inPlay');
+                        self._drawCards();
+                    } else if (d.text === 'Hand') {
+                        self.tableData.changeCardZone(card,
+                                                      'hand');
+                        self._drawCards();
+                    }
+                    d3.select('#cardButtons').selectAll("*").remove();
+                    d3.select('#enlargedCard').selectAll("*").remove();
+                });
+            cardButtons.append('rect')
+                .attr('x', function (d) {
+                    return card.enlargedX + card.enlargedWidth / 100 * d.x;
+                })
+                .attr('y', function (d) {
+                    return card.enlargedY + card.enlargedWidth / 100 * d.y;
+                })
+                .attr('width', function (d) {
+                    return card.enlargedWidth / 100 * d.width;
+                })
+                .attr('height', function (d) {
+                    return card.enlargedWidth / 100 * d.height;
+                })
+                .attr('rx', 5)
+                .attr('ry', 5);
+            cardButtons.append('text')
+                .html(function (d) {
+                    return d.text;
+                })
+                .style('font-size', function (d) {
+                    var size = 1 / self.scale
+                    return size + 'em';
+                })
+                .attr('x', function (d) {
+                    return card.enlargedX + card.enlargedWidth / 100 * (d.x + 2);
+                })
+                .attr('y', function (d) {
+                    return card.enlargedY + card.enlargedWidth / 100 * (d.y + 7);
+                });
+        }
+    }
     this.drawScoreBoard = function () {
         var playerArray = this.tableData.getPlayerArray();
 
         var players = d3.select('#scoreBoard').selectAll('tr')
             .data(playerArray,
-                  function (d) { return d.name; });
+                  function (d) {
+                    return d.name;
+                });
         var newPlayers = players.enter().append('tr');
 
         newPlayers.append('td').html(function (d) { return d.name; });
@@ -1013,9 +998,9 @@ function PlayAreaSVG() {
                 self.tableData.updatePlayerScore(d.name, d.score);
             });
 
-        players.selectAll('.score')
-            .attr('value', function (d) {
-                return d.score;
+        players.each(function (d) {
+            d3.select(this).select('.score')
+                .attr('value', d.score);
             });
 
         players.exit().remove();
@@ -1101,16 +1086,16 @@ function PlayAreaSVG() {
                 return d.text;
             })
             .style('font-size', function (d) {
-                var size = 1.5;
+                var size = self.markerSize;
                 // var size = 1 / self.scale;
                 return size + 'em';
             })
             .attr('x', function (d) {
-                return d.x + 3;
+                return d.x + self.markerSize * 1.5;
                 // return d.x + (2 / self.scale);
             })
             .attr('y', function (d) {
-                return d.y + 26;
+                return d.y + self.markerSize * 16;
                 // return d.y + (18 / self.scale);
             });
 
@@ -1222,6 +1207,8 @@ function MainApp() {
     this.coordDisplay = null;
     this.enlargedCard = null;
     this.mouseIsDown = false;
+    this.sleeping = true;
+    this.noChangesCount = 0;
 
     // cache data when feature is clicked
     this.infoCache = {};
@@ -1231,6 +1218,43 @@ function MainApp() {
         this.playAreaSVG.init();
         this.coordDisplay = $('#coordDisplay');
         this.enlargedCard = $('#enlargedCard');
+        this.updateFromServer();
+    };
+
+    this.updateFromServer = function () {
+        if (this.playAreaSVG.tableData.room !== null
+            & this.sleeping) {
+            this.sleeping = false;
+            $.post('tableState.php',
+                    {
+                        action: 'get_state',
+                        room: this.playAreaSVG.tableData.room,
+                        last_update_id: this.playAreaSVG.tableData.lastUpdateId
+                    },
+                    function (data) {
+                        if (!data.hasOwnProperty('no_changes')) {
+                            self.noChangesCount = 0;
+                            self.playAreaSVG.tableData.processRoomState(data);
+                            self.playAreaSVG._drawCards();
+                            self.playAreaSVG.drawMarkers();
+                            self.playAreaSVG.drawScoreBoard();
+                        } else {
+                            self.noChangesCount += 1;
+                        }
+                        // sleep after 20 minutes of inactivity
+                        // wake by dragging a card
+                        // XXX mention all this somewhere on the page
+                        self.sleeping = true;
+                        if (self.noChangesCount < 20) {
+                            self.updateFromServer();
+                        }
+                    },
+                    'json')
+            .fail(function () {
+                self.sleeping = true;
+                self.updateFromServer();
+            });
+        }
     };
     this.setCoordDisplay = function (x, y) {
         this.coordDisplay.html('x: ' + x + ' y: ' + y);
@@ -1253,9 +1277,9 @@ function MainApp() {
             this.playAreaSVG.continuePan(pageX, pageY);
         // update cursor coordinates
         } else {
-            // mousePos = this.playAreaSVG.getSVGCoordinates(pageX,
-            //                                               pageY);
-            // this.setCoordDisplay(mousePos.x, mousePos.y);
+            mousePos = this.playAreaSVG.getSVGCoordinates(pageX,
+                                                          pageY);
+            this.setCoordDisplay(mousePos.x, mousePos.y);
         }
     };
     this.endMouse = function (pageX, pageY) {
@@ -1286,6 +1310,10 @@ $(document).ready(function initialSetup() {
                 mainApp.playAreaSVG.zoomOut(event.pageX,
                                           event.pageY);
             }
+        },
+        'click': function hideButtons(event) {
+            d3.select('#cardButtons').selectAll("*").remove();
+            d3.select('#enlargedCard').selectAll("*").remove();
         }
     });
     $(document.body).on({
@@ -1340,6 +1368,7 @@ $(document).ready(function initialSetup() {
         mainApp.playAreaSVG._drawCards();
         mainApp.playAreaSVG.drawMarkers();
         mainApp.playAreaSVG.drawDeckList();
+        // mainApp.playAreaSVG.drawScoreBoard();
     });
     $('#setName').on('click', function setPlayer() {
         mainApp.playAreaSVG.tableData.setName($('#playerName').val());
@@ -1356,5 +1385,13 @@ $(document).ready(function initialSetup() {
         mainApp.playAreaSVG._drawCards();
         mainApp.playAreaSVG.drawMarkers();
         mainApp.playAreaSVG.drawDeckList();
+    });
+    $('#setMarkerSize').on('click', function setPlayer() {
+        mainApp.playAreaSVG.markerSize = $('#markerSize').val();
+        mainApp.playAreaSVG.drawMarkers();
+    });
+    $('#setCardSize').on('click', function setPlayer() {
+        mainApp.playAreaSVG.cardSize = $('#cardSize').val();
+        mainApp.playAreaSVG.drawMarkers();
     });
 });

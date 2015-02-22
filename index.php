@@ -19,20 +19,12 @@
 
 <svg id="playAreaSVG">
   <g id="tableGraphic"></g>
+  <g id="cardFrames"></g>
   <g id="players"></g>
   <g id="enlargedCard"></g>
   <g id="markers"></g>
   <g id="cardButtons"></g>
 </svg>
-
-<!-- <div id="viewControls" class="overlayItem">
-  <button id="zoomOut">
-    -
-  </button>
-  <button id="zoomIn">
-    +
-  </button>
-</div> -->
 
 <div id="coordDisplay" class="overlayItem">x: y:</div>
 <div id="motionDisplay" class="overlayItem">dx: dy:</div>
@@ -47,6 +39,7 @@
 
   <div id="playerNameBox">
     <h4>Player:</h4>
+    <select id="playerSelect"></select>
     <input id="playerName" type="text" value="defaultPlayer">
     <div><button id="setPlayer">Change Player</button></div>
     <div><button id="setName">Change Name</button></div>
@@ -75,6 +68,12 @@
     <h4>Marker Text:</h4>
     <input id="markerText" type="text" value="+1/+1">
     <button id="createMarker">Create</button>
+    <h4>Marker Size:</h4>
+    <input id="markerSize" type="text" value="3">
+    <button id="setMarkerSize">Change</button>
+    <h4>Enlarged Card Size:</h4>
+    <input id="cardSize" type="text" value="1">
+    <button id="setCardSize">Change</button>
   </div>
 </div>
 
