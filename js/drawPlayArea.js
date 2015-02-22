@@ -17,7 +17,9 @@ function Player(name) {
         var zoneArray = [];
         for (var zone in this.zones) {
             if (this.zones.hasOwnProperty(zone) &&
-                zone !== 'deck') {
+                zone !== 'deck' &&
+                (zone !== 'hand' ||
+                 this.name === mainApp.playAreaSVG.tableData.playerName)) {
                 zoneArray.push(this.zones[zone]);
             }
         }
@@ -483,7 +485,6 @@ function PlayAreaSVG() {
     this.svgWidth = null;
     this.svgHeight = null;
     this.tableData = null;
-    this.featureGroups = {};
 
     this.viewBox = {left: 0,
                     top: 0,
@@ -491,14 +492,10 @@ function PlayAreaSVG() {
                     height: 0};
 
     this.scale = 1;
-    this.boundary = null;
     this.markerSize = 3;
     this.cardSize = 1;
     this.noChangesCount = 0;
     this.sleeping = true;
-    this.featureClicked = false;
-    this.featureDragging = false;
-    self.buttonsDisplayed = false;
     this.playerRotations = {};
     // point that all players are rotated around.
     // y varies based on number of players
@@ -520,7 +517,6 @@ function PlayAreaSVG() {
 
     this.drag = d3.behavior.drag();
     this.drag.on('dragstart', function(d) {
-        self.featureDragging = true;
         self.dragOffset = {x: null,
                            y: null};
         d3.event.sourceEvent.stopPropagation();
@@ -528,11 +524,6 @@ function PlayAreaSVG() {
             parent = d3.select($(this).parent()[0]);
         if (drugObject.classed('enlarged')) {
             d.clicked = true;
-            // drugObject.attr('x', d.x)
-            //     .attr('y', d.y)
-            //     .attr('height', d.height)
-            //     .attr('width', d.width);
-            // drugObject = d.originCard;
             drugObject = d3.select('[player="' + d.playerName + '"]' +
                                    '[card_id="' + d.id + '"]')
             parent = d3.select($(drugObject[0][0]).parent()[0]);
@@ -547,7 +538,6 @@ function PlayAreaSVG() {
         });
 
         d.ordering = newOrdering;
-        // self.tableData.dbUpdateObject(d);
 
         siblings.sort(function(a, b) {
             return a.ordering - b.ordering;
@@ -567,7 +557,6 @@ function PlayAreaSVG() {
             };
         }
 
-        // move the card
         d.x = d3.event.x + self.dragOffset.x;
         d.y = d3.event.y + self.dragOffset.y;
 
@@ -576,7 +565,6 @@ function PlayAreaSVG() {
 
         if (drugObject.classed('enlarged')) {
             drugObject.style('opacity', '0.0');
-            // d.originCard.attr('opacity', '0.0');
 
             d.enlargedX = d3.event.x + self.dragOffset.enlargedX;
             d.enlargedY = d3.event.y + self.dragOffset.enlargedY;
@@ -593,8 +581,7 @@ function PlayAreaSVG() {
                                        imgCenterY + ')';
                 });
 
-            // move source card beneath it too
-            // drugObject = d.originCard;
+            // move source card beneath enlarged
             drugObject = d3.select('[player="' + d.playerName + '"]' +
                                    '[card_id="' + d.id + '"]')
         }
@@ -607,17 +594,19 @@ function PlayAreaSVG() {
             markerText.attr('x', d.x + 3)
                 .attr('y', d.y + 26);
         } else {
-            drugObject.attr('x', d.x)
+            var imgCenterX = d.x + d.width / 2,
+                imgCenterY = d.y + d.height / 2;
+            drugObject
+                .attr('x', d.x)
                 .attr('y', d.y)
-            .attr('transform', function (d) {
-                var imgCenterX = d.x + d.width / 2,
-                    imgCenterY = d.y + d.height / 2;
-                return 'rotate(' + d.rotation + ' ' + imgCenterX + ' ' + imgCenterY + ')';
-            });
+                .attr('transform', function (d) {
+                    return 'rotate(' + d.rotation + ' ' +
+                                       imgCenterX + ' ' +
+                                       imgCenterY + ')';
+                });
         }
     });
     this.drag.on('dragend', function (d) {
-        self.featureDragging = false;
         var drugObject = d3.select(this);
         if (drugObject.classed('enlarged')) {
             drugObject.style('opacity', '1.0');
@@ -638,8 +627,6 @@ function PlayAreaSVG() {
         this._drawCards();
     };
     this._drawCards = function () {
-        // d3.select('#cardButtons').selectAll("*").remove();
-
         var currentPlayer = this.tableData.player;
         if (currentPlayer.zones.hasOwnProperty('deck')) {
             $('#deckCount').text(currentPlayer.zones['deck'].cards.length);
@@ -727,21 +714,13 @@ function PlayAreaSVG() {
         });
         cards.on('click.enlarge', self.showEnlargedCard);
         cards.on('click.buttons', self.showCardButtons);
-        //          function (d) {
-        //     var clickedCard = d3.select(this);
-        //     clickedCard.call(self.showEnlargedCard(d));
-        //     clickedCard.call(self.showCardButtons(d));
-        // });
     };
     this.showEnlargedCard = function (d) {
         d3.event.stopPropagation(); // silence other listeners
         var originCard = d3.select(this);
         d.originCard = originCard;
 
-        if (self.scale < 0.8 &&
-            !self.featureDragging &&
-            (d.playerName === self.tableData.playerName ||
-             d.zone !== 'hand')) {
+        if (self.scale < 0.8) {
             var enlargedScale = self.scale / self.cardSize,
                 enlargedCardZone = d3.select('#enlargedCard'),
                 player = d3.select(d.originCard[0][0].parentNode.parentNode);
@@ -782,34 +761,6 @@ function PlayAreaSVG() {
                     d.enlargedHeight = d.height / enlargedScale;
                     return d.enlargedHeight;
                 });
-                // .on('mousemove', function (d) {
-                //     var svgCoords = self.getSVGCoordinates(d3.event.x,
-                //                                            d3.event.y);
-                //     mainApp.setCoordDisplay(d3.event.x, d3.event.y);
-                //     // XXX need to rotate d.x and y for this to work for
-                //     // rotated cards
-                //     // if (self.tableData.playerName === d.playerName &&
-                //     //     !self.buttonsDisplayed) {
-                //     //     if (svgCoords.x < d.x ||
-                //     //         svgCoords.x > d.x + d.width ||
-                //     //         svgCoords.y < d.y ||
-                //     //         svgCoords.y > d.y + d.height)
-                //     //     {
-                //     //         d3.select(this).remove();
-                //     //     }
-                //     // }
-                // })
-                // backup in case the mouse doesn't get caught in the
-                // mousemove removal zone
-                // .on('mouseleave', function (d) {
-                //     if (!self.featureDragging &&
-                //         (d3.event.toElement !== null &&
-                //          d3.event.toElement.nodeName !== 'rect')) {
-                //         // d3.select(this).remove();
-                //         // d3.select('#cardButtons').html('');
-                //         // self.buttonsDisplayed = false;
-                //     }
-                // })
             mainApp.enlargedCard.call(self.drag);
             newCardData.exit().remove();
 
@@ -826,7 +777,6 @@ function PlayAreaSVG() {
         d3.select('#cardButtons').selectAll("*").remove();
         if(self.tableData.playerName === d.playerName)
         {
-            self.buttonsDisplayed = true;
             // show buttons for own cards
             var card = d;
             // x/y/width/height are percentages of enlarged card width
@@ -1158,8 +1108,6 @@ function PlayAreaSVG() {
         this.viewBox.left = this.viewBoxStart.left - mouseDelta.x / this.scale;
         this.viewBox.top = this.viewBoxStart.top - mouseDelta.y / this.scale;
         self.applyViewBox();
-        // distinguish pans from clicks
-            self.featureClicked = false;
     };
     this.endPan = function (pageX, pageY) {
         this.lastTranslation = {
