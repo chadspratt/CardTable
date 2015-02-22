@@ -8,20 +8,20 @@ It's functional but still fairly minimal and rough. The code is running at http:
 To install your own instance you would need to either create a mysql database or edit tableState.php to use a different database type. The current schema is bare-bones.
 
 CurrentState:
-room - text
-player - text
-zone - text
-type - text
-id  int
-name - text
-imageUrl - text
-xPos - int
-yPos - int
-rotation - int
-ordering - int
+* room (text)
+* player (text)
+* zone (text)
+* type (text)
+* id  (t)
+* name (text)
+* imageUrl (text)
+* xPos (int)
+* yPos (int)
+* rotation (int)
+* ordering (int)
 
 LastRoomUpdate:
-id - autoincrement int
-room - text
+* id (autoincrement int)
+* room (text)
 
 You'll need a little more code to create the connection. I have an example for mysql in exampleconnection.inc
