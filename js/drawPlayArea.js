@@ -5,10 +5,19 @@ var mainApp,
         y: 100
     };
 
+function Zone(name) {
+    'use strict';
+    this.name = name;
+    this.cards = [];
+}
+
 function Player(name) {
     'use strict';
     this.name = name;
-    this.zones = {};
+    this.zones = {
+        deck: new Zone('deck'),
+        hand: new Zone('hand')
+    };
     this.nextMarkerId = 0;
     this.markers = [];
     this.cardCount = 0;
@@ -25,12 +34,6 @@ function Player(name) {
         }
         return zoneArray;
     };
-}
-
-function Zone(name) {
-    'use strict';
-    this.name = name;
-    this.cards = [];
 }
 
 function TableData() {
@@ -57,7 +60,6 @@ function TableData() {
     this.setPlayer = function (playerName) {
         if (!this.players.hasOwnProperty(playerName)) {
             this.players[playerName] = new Player(playerName);
-            this.players[playerName].zones['deck'] = new Zone('deck');
         }
 
         this.playerName = playerName;
@@ -926,6 +928,14 @@ function PlayAreaSVG() {
         var newPlayers = players.enter().append('tr');
 
         newPlayers.append('td').html(function (d) { return d.name; });
+        newPlayers.append('td').append('span')
+            .classed('handCountLabel', true)
+            .html('Hand:');
+        newPlayers.append('td').append('span')
+            .classed('handCount', true)
+            .html(function (d) {
+                return d.zones['hand'].cards.length;
+            });
         newPlayers.append('td').append('button')
             .classed('decrementScore', true)
             .html('-')
@@ -949,8 +959,12 @@ function PlayAreaSVG() {
             });
 
         players.each(function (d) {
-            d3.select(this).select('.score')
+            var rows = d3.select(this);
+            rows.select('.score')
                 .attr('value', d.score);
+
+            rows.select('.handCount')
+                .html(d.zones['hand'].cards.length);
             });
 
         players.exit().remove();
