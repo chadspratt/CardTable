@@ -256,7 +256,7 @@ else
     }
     elseif ($_POST["action"] === "set_deck_deal_point")
     {
-        $updateDeckDealPointQuery->bind_param("isss",
+        $updateDeckDealPointQuery->bind_param("iiss",
                                               $_POST["x"],
                                               $_POST["y"],
                                               $_POST["room"],
