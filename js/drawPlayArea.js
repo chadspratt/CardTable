@@ -747,7 +747,9 @@ function PlayAreaSVG() {
         var zones = players.selectAll('g')
             .data(function (d) { return d.getZonesAsArray(); },
                   function (d) { return d.name; });
-        zones.enter().append('g');
+        zones.enter().append('g')
+            .classed('cards_in_hand',
+                    function (d) { return d.name === 'hand'; });
         zones.exit().remove();
 
         var cards = zones.selectAll('image')

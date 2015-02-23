@@ -9,6 +9,9 @@ body {
     /*on bottom*/
     z-index: 0;
 }
+g.cards_in_hand image {
+    opacity: .7;
+}
 .hiddenFeatureGroup {
     display: none;
 }
