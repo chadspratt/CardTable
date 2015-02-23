@@ -4,59 +4,86 @@ session_start();
 require_once "../../db_connect/cards.inc";
 
 $connection = GetDatabaseConnection();
-$getStateQuery = $connection->prepare("SELECT player, zone, type, id, name,
-                                      imageUrl, xPos, yPos, rotation, ordering
-                                      FROM CurrentState
-                                      WHERE room = ?");
-$addQuery = $connection->prepare("INSERT INTO CurrentState
-                                 (room, player, zone, type, id, name,
-                                 imageUrl, xPos, yPos)
-                                 SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?");
-$addPlayerQuery = $connection->prepare("INSERT INTO CurrentState
-                                 (room, player, type, imageUrl)
-                                 SELECT ?, ?, ?, ?");
-$updatePlayerScoreQuery = $connection->prepare("UPDATE CurrentState SET
-                                    rotation = ?
-                                    WHERE room = ? AND player = ? AND
-                                    type = \"player\"");
-$updateTableImageUrlQuery = $connection->prepare("UPDATE CurrentState SET
-                                    imageUrl = ?
-                                    WHERE room = ? AND player = ? AND
-                                    type = \"player\"");
-$updatePlayerNameQuery = $connection->prepare("UPDATE CurrentState SET
-                                    player = ?
-                                    WHERE room = ? AND player = ?");
-$updateQuery = $connection->prepare("UPDATE CurrentState SET
-                                    zone = ?, xPos = ?, yPos = ?, rotation = ?,
-                                    ordering = ?
-                                    WHERE room = ? AND player = ? AND
-                                    type = ? AND id = ?");
-$updateDeckOrderQuery = $connection->prepare("UPDATE CurrentState SET
-                                    ordering = ?
-                                    WHERE room = ? AND player = ? AND
-                                    id = ? AND zone = 'deck'");
-$resetDeckQuery = $connection->prepare("UPDATE CurrentState SET
-                                    zone = \"deck\", xPos = ?, yPos = ?,
-                                    rotation = 0, ordering = 0
-                                    WHERE room = ? AND player = ? AND
-                                    type = \"card\"");
-$unrotatePlayerCardsQuery = $connection->prepare("UPDATE CurrentState SET
-                                    rotation = 0
-                                    WHERE room = ? AND player = ? AND
-                                    type = \"card\"");
-$resetMarkersQuery = $connection->prepare("DELETE FROM CurrentState
-                                          WHERE room = ? AND player = ?
-                                          AND type = \"marker\"");
-$removeQuery = $connection->prepare("DELETE FROM CurrentState
-                                    WHERE room = ? AND player = ? AND
-                                    type = ? AND id = ?");
-$removePlayerQuery = $connection->prepare("DELETE FROM CurrentState
-                                          WHERE room = ? AND player = ?");
-$markAsUpdatedQuery = $connection->prepare("INSERT INTO LastRoomUpdate
-                                           (room) SELECT ?");
-$checkForUpdateQuery = $connection->prepare("SELECT id FROM LastRoomUpdate
-                                            WHERE room = ? AND id > ?
-                                            ORDER BY id DESC");
+$getStateQuery = $connection->prepare(
+    "SELECT player, zone, type, id, name, imageUrl, xPos, yPos, rotation, ordering
+    FROM CurrentState
+    WHERE room = ?");
+$addQuery = $connection->prepare(
+    "INSERT INTO CurrentState
+    (room, player, zone, type, id, name, imageUrl, xPos, yPos)
+    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?");
+$checkForRoomQuery = $connection->prepare(
+    "SELECT COUNT(room)
+    FROM CurrentState
+    WHERE room = ? AND type = \"room\"");
+$checkForPlayerQuery = $connection->prepare(
+    "SELECT COUNT(player)
+    FROM CurrentState
+    WHERE room = ? AND player = ? AND type = \"player\"");
+$addRoomQuery = $connection->prepare(
+    "INSERT INTO CurrentState
+    (room, type, id)
+    SELECT ?, \"room\", 1");
+$addPlayerQuery = $connection->prepare(
+    "INSERT INTO CurrentState
+    (room, player, type, imageUrl)
+    SELECT ?, ?, ?, ?");
+$updatePlayerScoreQuery = $connection->prepare(
+    "UPDATE CurrentState SET
+    rotation = ?
+    WHERE room = ? AND player = ? AND type = \"player\"");
+$updateTableImageUrlQuery = $connection->prepare(
+    "UPDATE CurrentState SET
+    imageUrl = ?
+    WHERE room = ? AND player = ? AND type = \"player\"");
+$updateTableImageScaleQuery = $connection->prepare(
+    "UPDATE CurrentState SET
+    name = ?
+    WHERE room = ? AND player = ? AND type = \"player\"");
+$updateTableImageDistanceQuery = $connection->prepare(
+    "UPDATE CurrentState SET
+    name = ?
+    WHERE room = ? AND type = \"room\"");
+$updateDeckDealPointQuery = $connection->prepare(
+    "UPDATE CurrentState SET
+    xPos = ?, yPos = ?
+    WHERE room = ? AND player = ? AND type = \"player\"");
+$updatePlayerNameQuery = $connection->prepare(
+    "UPDATE CurrentState SET
+    player = ?
+    WHERE room = ? AND player = ?");
+$updateQuery = $connection->prepare(
+    "UPDATE CurrentState SET
+    zone = ?, xPos = ?, yPos = ?, rotation = ?, ordering = ?
+    WHERE room = ? AND player = ? AND type = ? AND id = ?");
+$updateDeckOrderQuery = $connection->prepare(
+    "UPDATE CurrentState SET
+    ordering = ?
+    WHERE room = ? AND player = ? AND id = ? AND zone = 'deck'");
+$resetDeckQuery = $connection->prepare(
+    "UPDATE CurrentState SET
+    zone = \"deck\", xPos = ?, yPos = ?, rotation = 0, ordering = 0
+    WHERE room = ? AND player = ? AND type = \"card\"");
+$unrotatePlayerCardsQuery = $connection->prepare(
+    "UPDATE CurrentState SET
+    rotation = 0
+    WHERE room = ? AND player = ? AND type = \"card\"");
+$resetMarkersQuery = $connection->prepare(
+    "DELETE FROM CurrentState
+    WHERE room = ? AND player = ? AND type = \"marker\"");
+$removeQuery = $connection->prepare(
+    "DELETE FROM CurrentState
+    WHERE room = ? AND player = ? AND type = ? AND id = ?");
+$removePlayerQuery = $connection->prepare(
+    "DELETE FROM CurrentState
+    WHERE room = ? AND player = ?");
+$markAsUpdatedQuery = $connection->prepare(
+    "INSERT INTO LastRoomUpdate
+    (room) SELECT ?");
+$checkForUpdateQuery = $connection->prepare(
+    "SELECT id FROM LastRoomUpdate
+    WHERE room = ? AND id > ?
+    ORDER BY id DESC");
 
 // for debugging
 if ($_SERVER['REQUEST_METHOD'] === 'GET')
@@ -152,8 +179,18 @@ else
         $_SESSION["room"] = $_POST["room"];
         $_SESSION["last_update_id"] = -1;
         session_write_close();
-        $connection->close();
-        return;
+        $checkForRoomQuery->bind_param("s", $_POST["room"]);
+
+        $checkForRoomQuery->execute();
+        $checkForRoomQuery->bind_result($existingCount);
+        $checkForRoomQuery->fetch();
+        $checkForRoomQuery->close();
+        if ($existingCount == 0)
+        {
+            $addRoomQuery->bind_param("s", $_POST["room"]);
+            $addRoomQuery->execute();
+            $addRoomQuery->close();
+        }
     }
     elseif ($_POST["action"] === "add")
     {
@@ -175,15 +212,26 @@ else
     }
     elseif ($_POST["action"] === "addPlayer")
     {
-        $addPlayerQuery->bind_param("ssss",
+        $checkForPlayerQuery->bind_param("ss",
                                     $_POST["room"],
-                                    $_POST["player"],
-                                    $_POST["type"],
-                                    $_POST["image_url"]);
-        $addPlayerQuery->execute();
-        $addPlayerQuery->close();
+                                    $_POST["player"]);
+
+        $checkForPlayerQuery->execute();
+        $checkForPlayerQuery->bind_result($existingCount);
+        $checkForPlayerQuery->fetch();
+        $checkForPlayerQuery->close();
+        if ($existingCount == 0)
+        {
+            $addPlayerQuery->bind_param("ssss",
+                                        $_POST["room"],
+                                        $_POST["player"],
+                                        $_POST["type"],
+                                        $_POST["image_url"]);
+            $addPlayerQuery->execute();
+            $addPlayerQuery->close();
+        }
     }
-    elseif ($_POST["action"] === "updateTableImageUrl")
+    elseif ($_POST["action"] === "update_table_image_url")
     {
         $updateTableImageUrlQuery->bind_param("sss",
                                               $_POST["image_url"],
@@ -191,6 +239,30 @@ else
                                               $_POST["player"]);
         $updateTableImageUrlQuery->execute();
         $updateTableImageUrlQuery->close();
+    }
+    elseif ($_POST["action"] === "update_table_image_scale_and_distance")
+    {
+        $updateTableImageScaleQuery->bind_param("sss",
+                                                $_POST["image_scale"],
+                                                $_POST["room"],
+                                                $_POST["player"]);
+        $updateTableImageScaleQuery->execute();
+        $updateTableImageScaleQuery->close();
+        $updateTableImageDistanceQuery->bind_param("ss",
+                                                   $_POST["image_distance"],
+                                                   $_POST["room"]);
+        $updateTableImageDistanceQuery->execute();
+        $updateTableImageDistanceQuery->close();
+    }
+    elseif ($_POST["action"] === "set_deck_deal_point")
+    {
+        $updateDeckDealPointQuery->bind_param("isss",
+                                              $_POST["x"],
+                                              $_POST["y"],
+                                              $_POST["room"],
+                                              $_POST["player"]);
+        $updateDeckDealPointQuery->execute();
+        $updateDeckDealPointQuery->close();
     }
     elseif ($_POST["action"] === "updatePlayerScore")
     {

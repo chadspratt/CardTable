@@ -83,14 +83,9 @@
       <button id="setTableImageUrl">Set</button>
     </div>
     <div>
-      Table Image Scale:
-      <input id="tableImageScale" type="text" size="1" value="1">
-      <button id="setTableImageScale">Set</button>
-    </div>
-    <div>
-      Table Radius:
-      <input id="tableRadius" type="text" size="1" value="750">
-      <button id="setTableRadius">Set</button>
+      Image Scale:<input id="tableImageScale" type="text" size="1" value="1" />
+      Distance:<input id="tableDistance" type="text" size="1" value="750">
+      <button id="setTableScaleAndDistance">Set</button>
     </div>
     <div>
       Marker Size:

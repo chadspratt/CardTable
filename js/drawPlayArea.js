@@ -1,9 +1,5 @@
 /*global $ */
-var mainApp,
-    deckDealPoint = {
-        x: 100,
-        y: 100
-    };
+var mainApp;
 
 function Zone(name) {
     'use strict';
@@ -23,6 +19,7 @@ function Player(name) {
     this.cardCount = 0;
     // this.score = 0;
     this.imageUrl = '';
+    this.imageScale = 1;
 
     this.getZonesAsArray = function () {
         var zoneArray = [];
@@ -49,7 +46,6 @@ function TableData() {
     this.playerCount = 0;
     this.lastUpdateId = -1;
     this.tableRadius = 750;
-    this.tableImageScale = 1;
 
     this.setRoom = function (roomName) {
         this.room = roomName;
@@ -70,6 +66,8 @@ function TableData() {
         this.player = this.players[playerName];
         d3.select('#tableImageUrl')
             .property('value', this.player.imageUrl);
+        d3.select('#tableImageScale')
+            .property('value', this.player.imageScale.toString());
     };
     this.setName = function (playerName) {
         // check if its a different name
@@ -95,7 +93,7 @@ function TableData() {
             // change name on server
             $.post('tableState.php',
                     {
-                        action: 'updateTableImageUrl',
+                        action: 'update_table_image_url',
                         room: this.room,
                         player: this.playerName,
                         image_url: tableImageUrl,
@@ -105,7 +103,37 @@ function TableData() {
                     },
                     'json');
         }
-
+    };
+    this.setTableImageScaleAndDistance = function (tableImageScale,
+                                                   tableImageDistance) {
+        // change name on server
+        $.post('tableState.php',
+                {
+                    action: 'update_table_image_scale_and_distance',
+                    room: this.room,
+                    player: this.playerName,
+                    image_scale: tableImageScale,
+                    image_distance: tableImageDistance,
+                },
+                function (data) {
+                    self.lastUpdateId = data.last_update_id;
+                },
+                'json');
+    };
+    this.setDeckDealPoint = function (x, y) {
+        // change name on server
+        $.post('tableState.php',
+                {
+                    action: 'set_deck_deal_point',
+                    room: this.room,
+                    player: this.playerName,
+                    x: x,
+                    y: y,
+                },
+                function (data) {
+                    self.lastUpdateId = data.last_update_id;
+                },
+                'json');
     };
     this.updatePlayerScore = function (name, score) {
         $.post('tableState.php',
@@ -276,10 +304,17 @@ function TableData() {
                 player.score = parseInt(object.rotation);
                 player.ordering = parseInt(object.ordering);
                 player.imageUrl = object.imageUrl
+                player.imageScale = object.name;
+                player.deckDealX = object.xPos;
+                player.deckDealY = object.yPos;
                 if (player.name === this.playerName) {
                     d3.select('#tableImageUrl')
                         .property('value', object.imageUrl);
                 }
+            } else if (object.type === 'room') {
+                this.tableRadius = object.name;
+                d3.select('#tableDistance')
+                    .property('value', this.tableRadius);
             }
         }
         for (var playerName in this.players) {
@@ -354,8 +389,8 @@ function TableData() {
             text: text,
             // to cram it in the same table as cards
             image_url: text,
-            x: deckDealPoint.x,
-            y: deckDealPoint.y,
+            x: this.player.deckDealX,
+            y: this.player.deckDealY,
             player: this.playerName,
             type: 'marker',
             ordering: 0
@@ -375,8 +410,8 @@ function TableData() {
 
                 for (var i = 0; i < zoneCards.length; i++) {
                     zoneCards[i].zone = 'deck';
-                    zoneCards[i].x = deckDealPoint.x;
-                    zoneCards[i].y = deckDealPoint.y;
+                    zoneCards[i].x = this.player.deckDealX;
+                    zoneCards[i].y = this.player.deckDealY;
                     zoneCards[i].rotation = 0;
                     zoneCards[i].ordering = 0;
                     deckCards.push(zoneCards[i]);
@@ -391,8 +426,8 @@ function TableData() {
                     action: 'reset_player',
                     room: this.room,
                     player: this.player.name,
-                    x: deckDealPoint.x,
-                    y: deckDealPoint.y
+                    x: this.player.deckDealX,
+                    y: this.player.deckDealY
                 },
                 function (data) {
                     self.lastUpdateId = data.last_update_id;
@@ -416,8 +451,8 @@ function TableData() {
     this.drawCard = function () {
         var deck = this.player.zones['deck'].cards;
         if (deck.length > 0) {
-            deck[deck.length - 1].x = deckDealPoint.x;
-            deck[deck.length - 1].y = deckDealPoint.y;
+            deck[deck.length - 1].x = this.player.deckDealX;
+            deck[deck.length - 1].y = this.player.deckDealY;
             this.changeCardZone(deck[deck.length - 1],
                                 'hand');
         }
@@ -547,7 +582,7 @@ function PlayAreaSVG() {
     this.playerRotations = {};
     // point that all players are rotated around.
     // y varies based on number of players
-    this.playerRotationPoint = {x: 100,
+    this.playerRotationPoint = {x: 0,
                                 y: 0};
 
     this.init = function () {
@@ -690,7 +725,7 @@ function PlayAreaSVG() {
                 d.rotation = 360 / playerArray.length * i;
                 d.yOffset = -1 * self.tableData.tableRadius * (playerArray.length);
 
-                return 'rotate(' + d.rotation + ' 100 ' + d.yOffset + ')';
+                return 'rotate(' + d.rotation + ' 0 ' + d.yOffset + ')';
             });
         players.select('image')
             .attr('xlink:href', function (d) {
@@ -704,16 +739,16 @@ function PlayAreaSVG() {
                 }
             })
             .attr('x', function (d) {
-                return -2250 * self.tableData.tableImageScale;
+                return -2250 * self.tableData.players[d.name].imageScale;
             })
             .attr('y', function (d) {
-                return -1200 * self.tableData.tableImageScale;
+                return -1200 * self.tableData.players[d.name].imageScale;
             })
             .attr('width', function (d) {
-                return 4500 * self.tableData.tableImageScale;
+                return 4500 * self.tableData.players[d.name].imageScale;
             })
             .attr('height', function (d) {
-                return 2400 * self.tableData.tableImageScale;
+                return 2400 * self.tableData.players[d.name].imageScale;
             });
         players.exit().remove();
     };
@@ -725,8 +760,9 @@ function PlayAreaSVG() {
         this.drawDeckList();
 
         var playerArray = this.tableData.getPlayerArray();
-        this.playerRotationPoint = {x: 100,
-                                    y: -1 * self.tableData.tableRadius * (playerArray.length)};
+        this.playerRotationPoint = {x: 0,
+                                    y: -1 * self.tableData.tableRadius *
+                                    (playerArray.length)};
         var players = d3.select('#players').selectAll('g')
             .data(playerArray,
                   function (d) { return d.name; });
@@ -773,13 +809,13 @@ function PlayAreaSVG() {
             })
             .attr('x', function (d, i) {
                 if (!d.hasOwnProperty('x')) {
-                    d.x = deckDealPoint.x;
+                    d.x = 0;
                 }
                 return d.x;
             })
             .attr('y', function (d) {
                 if (!d.hasOwnProperty('y')) {
-                    d.y = deckDealPoint.y;
+                    d.y = 0;
                 }
                 return d.y;
             })
@@ -798,7 +834,9 @@ function PlayAreaSVG() {
             .attr('transform', function (d) {
                 var imgCenterX = d.x + d.width / 2,
                     imgCenterY = d.y + d.height / 2;
-                return 'rotate(' + d.rotation + ' ' + imgCenterX + ' ' + imgCenterY + ')';
+                return 'rotate(' + d.rotation + ' ' +
+                                   imgCenterX + ' ' +
+                                   imgCenterY + ')';
             })
             .call(this.drag);
         cards.exit().remove();
@@ -819,7 +857,7 @@ function PlayAreaSVG() {
                 d.rotation = 360 / playerArray.length * i;
                 d.yOffset = -1 * self.tableData.tableRadius * (playerArray.length);
 
-                return 'rotate(' + d.rotation + ' 100 ' + d.yOffset + ')';
+                return 'rotate(' + d.rotation + ' 0 ' + d.yOffset + ')';
             });
         players.exit().remove();
 
@@ -1433,6 +1471,7 @@ $(document).ready(function initialSetup() {
     });
     $('#setPlayer').on('click', function setPlayer() {
         mainApp.playAreaSVG.tableData.setPlayer($('#playerName').val());
+        mainApp.playAreaSVG.drawTable();
         mainApp.playAreaSVG._drawCards();
         mainApp.playAreaSVG.drawMarkers();
         mainApp.playAreaSVG.drawDeckList();
@@ -1448,12 +1487,10 @@ $(document).ready(function initialSetup() {
         mainApp.playAreaSVG.tableData.setTableImageUrl($('#tableImageUrl').val());
         mainApp.playAreaSVG.drawTable();
     });
-    $('#setTableRadius').on('click', function setTableRadius() {
-        mainApp.playAreaSVG.tableData.tableRadius = $('#tableRadius').val();
-        mainApp.playAreaSVG.drawTable();
-    });
-    $('#setTableImageScale').on('click', function setTableImageScale() {
-        mainApp.playAreaSVG.tableData.tableImageScale = $('#tableImageScale').val();
+    $('#setTableScaleAndDistance').on('click', function setTableRadius() {
+        mainApp.playAreaSVG.tableData.setTableImageScaleAndDistance(
+            $('#tableImageScale').val(),
+            $('#tableDistance').val());
         mainApp.playAreaSVG.drawTable();
     });
     $('#createMarker').on('click', function createMarker() {
@@ -1475,7 +1512,7 @@ $(document).ready(function initialSetup() {
         mainApp.playAreaSVG.drawMarkers();
     });
     $('#setDeckDealPoint').on('click', function setCardSize() {
-        deckDealPoint.x = $('#deckDealX').val();
-        deckDealPoint.y = $('#deckDealY').val();
+        mainApp.playAreaSVG.tableData.setDeckDealPoint($('#deckDealX').val(),
+                                                       $('#deckDealY').val());
     });
 });
