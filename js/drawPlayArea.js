@@ -21,7 +21,7 @@ function Player(name) {
     this.nextMarkerId = 0;
     this.markers = [];
     this.cardCount = 0;
-    this.score = 0;
+    // this.score = 0;
     this.imageUrl = '';
 
     this.getZonesAsArray = function () {
@@ -398,6 +398,7 @@ function TableData() {
                     self.lastUpdateId = data.last_update_id;
                 },
                 'json');
+        this.shuffleDeck();
     };
     this.shuffleDeck = function () {
         var deck = this.player.zones['deck'].cards;
