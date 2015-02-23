@@ -45,34 +45,18 @@
     <div><button id="setName">Change Name</button></div>
   </div>
 
-  <div id="tableImageBox">
-    <h4>Table Image:</h4>
-    <input id="tableImageUrl" type="text" value="">
-    <button id="setTableImageUrl">Set</button>
-  </div>
-
-  <div id="tableImageScaleBox">
-    <h4>Table Image Scale:</h4>
-    <input id="tableImageScale" type="text" value="1">
-    <button id="setTableImageScale">Set</button>
-  </div>
-
-  <div id="tableRadiusBox">
-    <h4>Table Radius:</h4>
-    <input id="tableRadius" type="text" value="1000">
-    <button id="setTableRadius">Set</button>
-  </div>
-
   <div id="deckBox" class="overlayItem inline">
     <H2>Deck (<span id="deckCount">0</span> cards)</H2>
     <button id="drawCard">Draw</button>
     <button id="showDeckList">List</button>
     <button id="shuffleDeck">Shuffle</button>
     <button id="resetPlayer">Reset</button>
+
     <div id="deckListBox">
       <select id="deckList" size="15"></select>
       <div><button id="drawSelectedCard">Draw Selected</button></div>
     </div>
+
     <div id="loadDeckBox">
       <div id="loadDeckHeader" class="links">Load From CSV</div>
       <div id="loadDeckForm">
@@ -82,16 +66,45 @@
     </div>
   </div>
 
-  <div id="markerBox">
+  <div id="createMarkerBox">
     <h4>Marker Text:</h4>
     <input id="markerText" type="text" value="+1/+1">
     <button id="createMarker">Create</button>
-    <h4>Marker Size:</h4>
-    <input id="markerSize" type="text" value="3">
-    <button id="setMarkerSize">Change</button>
-    <h4>Enlarged Card Size:</h4>
-    <input id="cardSize" type="text" value="1">
-    <button id="setCardSize">Change</button>
+  </div>
+
+  <div id="settingsHeader" class="links">Settings</div>
+  <div id="settingsBox">
+    <div>
+      Table Image:
+      <input id="tableImageUrl" type="text" value="">
+      <button id="setTableImageUrl">Set</button>
+    </div>
+    <div>
+      Table Image Scale:
+      <input id="tableImageScale" type="text" size="1" value="1">
+      <button id="setTableImageScale">Set</button>
+    </div>
+    <div>
+      Table Radius:
+      <input id="tableRadius" type="text" size="1" value="750">
+      <button id="setTableRadius">Set</button>
+    </div>
+    <div>
+      Marker Size:
+      <input id="markerSize" type="text" size="1" value="3">
+      <button id="setMarkerSize">Set</button>
+    </div>
+    <div>
+      Enlarged Card Size:
+      <input id="cardSize" type="text" size="1" value="1">
+      <button id="setCardSize">Set</button>
+    </div>
+    <div>
+      Deck Deal Point:
+      x<input id="deckDealX" type="text" size="1" value="100">
+      y<input id="deckDealY" type="text" size="1" value="100">
+      <button id="setDeckDealPoint">Set</button>
+    </div>
   </div>
 </div>
 

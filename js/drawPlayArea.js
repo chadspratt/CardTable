@@ -48,7 +48,7 @@ function TableData() {
     this.players = {};
     this.playerCount = 0;
     this.lastUpdateId = -1;
-    this.tableRadius = 1100;
+    this.tableRadius = 750;
     this.tableImageScale = 1;
 
     this.setRoom = function (roomName) {
@@ -68,6 +68,8 @@ function TableData() {
 
         this.playerName = playerName;
         this.player = this.players[playerName];
+        d3.select('#tableImageUrl')
+            .property('value', this.player.imageUrl);
     };
     this.setName = function (playerName) {
         // check if its a different name
@@ -274,6 +276,10 @@ function TableData() {
                 player.score = parseInt(object.rotation);
                 player.ordering = parseInt(object.ordering);
                 player.imageUrl = object.imageUrl
+                if (player.name === this.playerName) {
+                    d3.select('#tableImageUrl')
+                        .property('value', object.imageUrl);
+                }
             }
         }
         for (var playerName in this.players) {
@@ -409,6 +415,8 @@ function TableData() {
     this.drawCard = function () {
         var deck = this.player.zones['deck'].cards;
         if (deck.length > 0) {
+            deck[deck.length - 1].x = deckDealPoint.x;
+            deck[deck.length - 1].y = deckDealPoint.y;
             this.changeCardZone(deck[deck.length - 1],
                                 'hand');
         }
@@ -678,16 +686,16 @@ function PlayAreaSVG() {
                 }
             })
             .attr('x', function (d) {
-                return -3000 * self.tableData.tableImageScale;
+                return -2250 * self.tableData.tableImageScale;
             })
             .attr('y', function (d) {
-                return -1600 * self.tableData.tableImageScale;
+                return -1200 * self.tableData.tableImageScale;
             })
             .attr('width', function (d) {
-                return 6000 * self.tableData.tableImageScale;
+                return 4500 * self.tableData.tableImageScale;
             })
             .attr('height', function (d) {
-                return 3200 * self.tableData.tableImageScale;
+                return 2400 * self.tableData.tableImageScale;
             });
         players.exit().remove();
     };
@@ -1375,6 +1383,10 @@ $(document).ready(function initialSetup() {
     $('#loadDeckHeader').on('click', function showLoadDeckForm() {
         $('#loadDeckForm').toggle();
     });
+    $('#settingsBox').hide();
+    $('#settingsHeader').on('click', function showLoadDeckForm() {
+        $('#settingsBox').toggle();
+    });
     $('#loadDeck').on('click', function passCSVToTableData() {
         var deckCSV = $('#deckCSV').val();
         mainApp.playAreaSVG.tableData.loadDeckFromCSV(deckCSV);
@@ -1434,5 +1446,9 @@ $(document).ready(function initialSetup() {
     $('#setCardSize').on('click', function setCardSize() {
         mainApp.playAreaSVG.cardSize = $('#cardSize').val();
         mainApp.playAreaSVG.drawMarkers();
+    });
+    $('#setDeckDealPoint').on('click', function setCardSize() {
+        deckDealPoint.x = $('#deckDealX').val();
+        deckDealPoint.y = $('#deckDealY').val();
     });
 });
