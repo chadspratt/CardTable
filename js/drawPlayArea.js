@@ -990,43 +990,46 @@ function PlayAreaSVG() {
                 });
         var newPlayers = players.enter().append('tr');
 
-        newPlayers.append('td').html(function (d) { return d.name; });
-        newPlayers.append('td').append('span')
-            .classed('handCountLabel', true)
-            .html('Hand:');
-        newPlayers.append('td').append('span')
-            .classed('handCount', true)
-            .html(function (d) {
-                return d.zones['hand'].cards.length;
-            });
-        newPlayers.append('td').append('button')
-            .classed('decrementScore', true)
-            .html('-')
-            .on('click', function (d) {
-                d.score -= 1;
-                self.tableData.updatePlayerScore(d.name, d.score);
-            });
-        newPlayers.append('td').append('input')
-            .classed('score', true)
-            .attr('size', 1)
-            .on('input', function (d) {
-                d.score = this.value;
-                self.tableData.updatePlayerScore(d.name, d.score);
-            });
-        newPlayers.append('td').append('button')
-            .classed('decrementScore', true)
-            .html('+')
-            .on('click', function (d) {
-                d.score += 1;
-                self.tableData.updatePlayerScore(d.name, d.score);
-            });
+        newPlayers.each(function (d) {
+            var playerRow = d3.select(this);
+            playerRow.append('td').html(function (d) { return d.name; });
+            playerRow.append('td').append('span')
+                .classed('handCountLabel', true)
+                .html('Hand:');
+            playerRow.append('td').append('span')
+                .classed('handCount', true)
+                .html(function () {
+                    return d.zones['hand'].cards.length;
+                });
+            playerRow.append('td').append('button')
+                .classed('decrementScore', true)
+                .html('-')
+                .on('click', function () {
+                    d.score -= 1;
+                    self.tableData.updatePlayerScore(d.name, d.score);
+                });
+            playerRow.append('td').append('input')
+                .classed('score', true)
+                .attr('size', 1)
+                .on('input', function () {
+                    d.score = parseInt(this.value);
+                    self.tableData.updatePlayerScore(d.name, d.score);
+                });
+            playerRow.append('td').append('button')
+                .classed('incrementScore', true)
+                .html('+')
+                .on('click', function () {
+                    d.score += 1;
+                    self.tableData.updatePlayerScore(d.name, d.score);
+                });
+        });
 
         players.each(function (d) {
-            var rows = d3.select(this);
-            rows.select('.score')
-                .attr('value', d.score);
+            var row = d3.select(this);
+            row.select('.score')
+                .property('value', d.score);
 
-            rows.select('.handCount')
+            row.select('.handCount')
                 .html(d.zones['hand'].cards.length);
             });
 
