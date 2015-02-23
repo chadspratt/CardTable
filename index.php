@@ -21,8 +21,8 @@
   <g id="tableGraphic"></g>
   <g id="cardFrames"></g>
   <g id="players"></g>
-  <g id="enlargedCard"></g>
   <g id="markers"></g>
+  <g id="enlargedCard"></g>
   <g id="cardButtons"></g>
 </svg>
 

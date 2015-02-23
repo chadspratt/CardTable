@@ -354,8 +354,8 @@ function TableData() {
             text: text,
             // to cram it in the same table as cards
             image_url: text,
-            x: 0,
-            y: 0,
+            x: deckDealPoint.x,
+            y: deckDealPoint.y,
             player: this.playerName,
             type: 'marker',
             ordering: 0
@@ -529,6 +529,7 @@ function PlayAreaSVG() {
     this.cardSize = 1;
     this.noChangesCount = 0;
     this.sleeping = true;
+    this.dragInProgress = false;
     this.playerRotations = {};
     // point that all players are rotated around.
     // y varies based on number of players
@@ -550,6 +551,7 @@ function PlayAreaSVG() {
 
     this.drag = d3.behavior.drag();
     this.drag.on('dragstart', function(d) {
+        self.dragInProgress = true;
         self.dragOffset = {x: null,
                            y: null};
         d3.event.sourceEvent.stopPropagation();
@@ -562,8 +564,8 @@ function PlayAreaSVG() {
             parent = d3.select($(drugObject[0][0]).parent()[0]);
         } else {
             d3.select('#enlargedCard image').remove();
-            d3.select('#cardButtons').selectAll("*").remove();
         }
+        d3.select('#cardButtons').selectAll("*").remove();
         // put the card on top of other cards in its group
         var newOrdering = 0,
             siblings = parent.selectAll('image');
@@ -581,7 +583,7 @@ function PlayAreaSVG() {
     });
     this.drag.on('drag', function (d) {
         // d3.event.sourceEvent.stopPropagation();
-        d3.select('#cardButtons').selectAll("*").remove();
+        // d3.select('#cardButtons').selectAll("*").remove();
         d.clicked = false;
         var drugObject = d3.select(this);
         if (self.dragOffset.x === null) {
@@ -643,6 +645,7 @@ function PlayAreaSVG() {
         }
     });
     this.drag.on('dragend', function (d) {
+        self.dragInProgress = false;
         var drugObject = d3.select(this);
         if (drugObject.classed('enlarged')) {
             drugObject.style('opacity', '1.0');
@@ -956,7 +959,7 @@ function PlayAreaSVG() {
                         self._drawCards();
                     }
                     d3.select('#cardButtons').selectAll("*").remove();
-                    d3.select('#enlargedCard').selectAll("*").remove();
+                    // d3.select('#enlargedCard').selectAll("*").remove();
                 });
             cardButtons.append('rect')
                 .attr('x', function (d) {
@@ -1269,22 +1272,28 @@ function MainApp() {
                         last_update_id: this.playAreaSVG.tableData.lastUpdateId
                     },
                     function (data) {
-                        if (!data.hasOwnProperty('no_changes')) {
-                            self.noChangesCount = 0;
-                            self.playAreaSVG.tableData.processRoomState(data);
-                            self.playAreaSVG.drawTable();
-                            self.playAreaSVG._drawCards();
-                            self.playAreaSVG.drawMarkers();
-                            self.playAreaSVG.drawScoreBoard();
+                        // don't update while something is being drug
+                        if (self.playAreaSVG.dragInProgress) {
+                            self.sleeping = true;
                         } else {
-                            self.noChangesCount += 1;
-                        }
-                        // sleep after 20 minutes of inactivity
-                        // wake by dragging a card
-                        // XXX mention all this somewhere on the page
-                        self.sleeping = true;
-                        if (self.noChangesCount < 20) {
-                            self.updateFromServer();
+                            if (!data.hasOwnProperty('no_changes') &&
+                                !self.playAreaSVG.dragInProgress) {
+                                self.noChangesCount = 0;
+                                self.playAreaSVG.tableData.processRoomState(data);
+                                self.playAreaSVG.drawTable();
+                                self.playAreaSVG._drawCards();
+                                self.playAreaSVG.drawMarkers();
+                                self.playAreaSVG.drawScoreBoard();
+                            } else {
+                                self.noChangesCount += 1;
+                            }
+                            // sleep after 20 minutes of inactivity
+                            // wake by dragging a card
+                            // XXX mention all this somewhere on the page
+                            self.sleeping = true;
+                            if (self.noChangesCount < 20) {
+                                self.updateFromServer();
+                            }
                         }
                     },
                     'json')
