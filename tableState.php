@@ -19,6 +19,10 @@ $updatePlayerScoreQuery = $connection->prepare("UPDATE CurrentState SET
                                     rotation = ?
                                     WHERE room = ? AND player = ? AND
                                     type = \"player\"");
+$updateTableImageUrlQuery = $connection->prepare("UPDATE CurrentState SET
+                                    imageUrl = ?
+                                    WHERE room = ? AND player = ? AND
+                                    type = \"player\"");
 $updatePlayerNameQuery = $connection->prepare("UPDATE CurrentState SET
                                     player = ?
                                     WHERE room = ? AND player = ?");
@@ -174,6 +178,15 @@ else
                                     $_POST["image_url"]);
         $addPlayerQuery->execute();
         $addPlayerQuery->close();
+    }
+    elseif ($_POST["action"] === "updateTableImageUrl")
+    {
+        $updateTableImageUrlQuery->bind_param("sss",
+                                              $_POST["image_url"],
+                                              $_POST["room"],
+                                              $_POST["player"]);
+        $updateTableImageUrlQuery->execute();
+        $updateTableImageUrlQuery->close();
     }
     elseif ($_POST["action"] === "updatePlayerScore")
     {

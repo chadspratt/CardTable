@@ -45,12 +45,30 @@
     <div><button id="setName">Change Name</button></div>
   </div>
 
+  <div id="tableImageBox">
+    <h4>Table Image:</h4>
+    <input id="tableImageUrl" type="text" value="">
+    <button id="setTableImageUrl">Set</button>
+  </div>
+
+  <div id="tableImageScaleBox">
+    <h4>Table Image Scale:</h4>
+    <input id="tableImageScale" type="text" value="1">
+    <button id="setTableImageScale">Set</button>
+  </div>
+
+  <div id="tableRadiusBox">
+    <h4>Table Radius:</h4>
+    <input id="tableRadius" type="text" value="1000">
+    <button id="setTableRadius">Set</button>
+  </div>
+
   <div id="deckBox" class="overlayItem inline">
     <H2>Deck (<span id="deckCount">0</span> cards)</H2>
     <button id="drawCard">Draw</button>
     <button id="showDeckList">List</button>
     <button id="shuffleDeck">Shuffle</button>
-    <button id="resetDeck">Reset</button>
+    <button id="resetPlayer">Reset</button>
     <div id="deckListBox">
       <select id="deckList" size="15"></select>
       <div><button id="drawSelectedCard">Draw Selected</button></div>
