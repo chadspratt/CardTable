@@ -40,6 +40,10 @@ $resetDeckQuery = $connection->prepare("UPDATE CurrentState SET
                                     rotation = 0, ordering = 0
                                     WHERE room = ? AND player = ? AND
                                     type = \"card\"");
+$unrotatePlayerCardsQuery = $connection->prepare("UPDATE CurrentState SET
+                                    rotation = 0
+                                    WHERE room = ? AND player = ? AND
+                                    type = \"card\"");
 $resetMarkersQuery = $connection->prepare("DELETE FROM CurrentState
                                           WHERE room = ? AND player = ?
                                           AND type = \"marker\"");
@@ -249,6 +253,14 @@ else
                                        $_POST["player"]);
         $resetMarkersQuery->execute();
         $resetMarkersQuery->close();
+    }
+    elseif ($_POST["action"] === "unrotate_player_cards")
+    {
+        $unrotatePlayerCardsQuery->bind_param("ss",
+                                              $_POST["room"],
+                                              $_POST["player"]);
+        $unrotatePlayerCardsQuery->execute();
+        $unrotatePlayerCardsQuery->close();
     }
     elseif ($_POST["action"] === "remove")
     {

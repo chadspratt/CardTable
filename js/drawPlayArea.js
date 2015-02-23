@@ -480,6 +480,20 @@ function TableData() {
         card.rotation = (card.rotation + 90) % 360;
         this.dbUpdateObject(card);
     };
+    this.unrotatePlayerCards = function () {
+        if (this.room !== null && this.player !== null) {
+            $.post('tableState.php',
+                    {
+                        action: 'unrotate_player_cards',
+                        room: this.room,
+                        player: this.playerName
+                    },
+                    function (data) {
+                        self.lastUpdateId = data.last_update_id;
+                    },
+                    'json');
+        }
+    };
     this.getPlayerArray = function () {
         var playerArray = [],
             i = 0;
@@ -792,6 +806,63 @@ function PlayAreaSVG() {
         cards.on('click.enlarge', self.showEnlargedCard);
         cards.on('click.buttons', self.showCardButtons);
     };
+    this.drawMarkers = function () {
+        var playerArray = this.tableData.getPlayerArray();
+        var players = d3.select('#markers').selectAll('g')
+            .data(playerArray,
+                  function (d) { return d.name; });
+        players.enter().append('g');
+        players
+            .attr('transform', function (d, i) {
+                d.rotation = 360 / playerArray.length * i;
+                d.yOffset = -1 * self.tableData.tableRadius * (playerArray.length);
+
+                return 'rotate(' + d.rotation + ' 100 ' + d.yOffset + ')';
+            });
+        players.exit().remove();
+
+        var markers = players.selectAll('g')
+            .data(function (d) { return d.markers; },
+                  function (d) { return d.id; });
+        markers.enter().append('g')
+            .classed('marker', true);
+        markers.exit().remove();
+
+        markers.append('rect')
+            .attr('x', function (d) {
+                return d.x;
+            })
+            .attr('y', function (d) {
+                return d.y;
+            })
+            .attr('rx', 5)
+            .attr('ry', 5);
+        markers.append('text')
+            .html(function (d) {
+                return d.text;
+            })
+            .style('font-size', function (d) {
+                var size = self.markerSize;
+                // var size = 1 / self.scale;
+                return size + 'em';
+            })
+            .attr('x', function (d) {
+                return d.x + self.markerSize * 1.5;
+                // return d.x + (2 / self.scale);
+            })
+            .attr('y', function (d) {
+                return d.y + self.markerSize * 16;
+                // return d.y + (18 / self.scale);
+            });
+
+        markers.each(function (d) {
+            var textSize = d3.select(this).select('text').node().getBBox();
+            d3.select(this).select('rect')
+                .attr("width", textSize.width + 4)
+                .attr("height", textSize.height + 4);
+        });
+        markers.call(self.drag);
+    };
     this.showEnlargedCard = function (d) {
         d3.event.stopPropagation(); // silence other listeners
         var originCard = d3.select(this);
@@ -881,9 +952,9 @@ function PlayAreaSVG() {
                 },
                 hand: {
                     text: 'Hand',
-                    x: 30,
+                    x: 26,
                     y: 20,
-                    width: 40,
+                    width: 47,
                     height: 10
                 },
                 deckBottom: {
@@ -893,11 +964,11 @@ function PlayAreaSVG() {
                     width: 10,
                     height: 10
                 },
-                deck: {
-                    text: 'Deck',
-                    x: 30,
+                unrotate: {
+                    text: 'Unrotate All',
+                    x: 26,
                     y: 35,
-                    width: 40,
+                    width: 47,
                     height: 10
                 },
                 deckTop: {
@@ -914,7 +985,6 @@ function PlayAreaSVG() {
                 buttons = [
                     buttonData.play,
                     buttonData.deckTop,
-                    buttonData.deck,
                     buttonData.deckBottom
                 ];
             } else if (d.zone === 'inPlay') {
@@ -923,7 +993,7 @@ function PlayAreaSVG() {
                     buttonData.hand,
                     buttonData.rotateRight,
                     buttonData.deckTop,
-                    buttonData.deck,
+                    buttonData.unrotate,
                     buttonData.deckBottom
                 ];
             }
@@ -957,6 +1027,8 @@ function PlayAreaSVG() {
                         self.tableData.changeCardZone(card,
                                                       'hand');
                         self._drawCards();
+                    } else if (d.text === 'Unrotate All') {
+                        self.tableData.unrotatePlayerCards();
                     }
                     d3.select('#cardButtons').selectAll("*").remove();
                     // d3.select('#enlargedCard').selectAll("*").remove();
@@ -1091,63 +1163,6 @@ function PlayAreaSVG() {
             });
 
         cards.exit().remove();
-    };
-    this.drawMarkers = function () {
-        var playerArray = this.tableData.getPlayerArray();
-        var players = d3.select('#markers').selectAll('g')
-            .data(playerArray,
-                  function (d) { return d.name; });
-        players.enter().append('g');
-        players
-            .attr('transform', function (d, i) {
-                d.rotation = 360 / playerArray.length * i;
-                d.yOffset = -1 * self.tableData.tableRadius * (playerArray.length);
-
-                return 'rotate(' + d.rotation + ' 100 ' + d.yOffset + ')';
-            });
-        players.exit().remove();
-
-        var markers = players.selectAll('g')
-            .data(function (d) { return d.markers; },
-                  function (d) { return d.id; });
-        markers.enter().append('g')
-            .classed('marker', true);
-        markers.exit().remove();
-
-        markers.append('rect')
-            .attr('x', function (d) {
-                return d.x;
-            })
-            .attr('y', function (d) {
-                return d.y;
-            })
-            .attr('rx', 5)
-            .attr('ry', 5);
-        markers.append('text')
-            .html(function (d) {
-                return d.text;
-            })
-            .style('font-size', function (d) {
-                var size = self.markerSize;
-                // var size = 1 / self.scale;
-                return size + 'em';
-            })
-            .attr('x', function (d) {
-                return d.x + self.markerSize * 1.5;
-                // return d.x + (2 / self.scale);
-            })
-            .attr('y', function (d) {
-                return d.y + self.markerSize * 16;
-                // return d.y + (18 / self.scale);
-            });
-
-        markers.each(function (d) {
-            var textSize = d3.select(this).select('text').node().getBBox();
-            d3.select(this).select('rect')
-                .attr("width", textSize.width + 4)
-                .attr("height", textSize.height + 4);
-        });
-        markers.call(self.drag);
     };
     this.resizeSVG = function () {
         // http://stackoverflow.com/a/16265661/225730
