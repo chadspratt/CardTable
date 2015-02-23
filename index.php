@@ -60,6 +60,9 @@
     <div id="loadDeckBox">
       <div id="loadDeckHeader" class="links">Load From CSV</div>
       <div id="loadDeckForm">
+        <div>Required Columns:</div>
+        <div>name, image_url, count</div>
+        <div> (case-sensitive but any order)</div>
         <textarea type="text" id="deckCSV" value="" rows="10" cols="25"></textarea>
         <div><button id="loadDeck">Load</button></div>
       </div>
