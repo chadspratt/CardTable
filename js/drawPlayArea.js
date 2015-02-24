@@ -77,7 +77,6 @@ function TableData() {
                     action: 'addPlayer',
                     room: this.room,
                     player: playerName,
-                    type: 'player',
                     // storing score in image_url
                     image_url: '0',
                     ordering: this.playerCount
@@ -346,9 +345,6 @@ function TableData() {
                                 return  a.ordering - b.ordering;
                             });
                     }
-                }
-                if (!this.players[playerName].hasOwnProperty('score')) {
-                    this.addPlayer(playerName)
                 }
             }
         }
@@ -755,13 +751,15 @@ function PlayAreaSVG() {
             });
         players.select('image')
             .attr('xlink:href', function (d) {
+                // this will be a broken link for unset players
                 return d.imageUrl;
             })
-            .style('opacity', function (d) {
+            .style('display', function (d) {
+                // this is a crude filter for unset values (which will be '0')
                 if (d.imageUrl.length > 5) {
-                    return "1.0"
+                    return ""
                 } else {
-                    return "0.0"
+                    return "none"
                 }
             })
             .attr('x', function (d) {
@@ -1548,8 +1546,9 @@ $(document).ready(function initialSetup() {
         mainApp.playAreaSVG.drawDeckList();
         // mainApp.playAreaSVG.drawScoreBoard();
     });
-    $('#addPlayer').on('click', function setPlayer() {
+    $('#addPlayer').on('click', function addPlayer() {
         var newPlayer = $('#playerName').val();
+        mainApp.playAreaSVG.tableData.addPlayer(newPlayer);
         mainApp.playAreaSVG.tableData.setPlayer(newPlayer);
         mainApp.playAreaSVG.drawTable();
         mainApp.playAreaSVG._drawCards();
@@ -1559,7 +1558,7 @@ $(document).ready(function initialSetup() {
         mainApp.playAreaSVG.drawScoreBoard();
         d3.select('#playerSelect').property('value', newPlayer);
     });
-    $('#removePlayer').on('click', function setPlayer() {
+    $('#removePlayer').on('click', function removePlayer() {
         var playerName = $('#playerName').val();
         mainApp.playAreaSVG.tableData._dbRemovePlayerObjects(playerName);
         mainApp.playAreaSVG.drawTable();

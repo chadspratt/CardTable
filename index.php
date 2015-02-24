@@ -33,7 +33,10 @@
 <div id="gameControls">
   <div id="roomNameBox">
     <h4>Room:</h4>
-    <input id="roomName" type="text" value="Room">
+    <input id="roomName" type="text" value="<?php
+      if (isset($_GET["room"]))
+        { echo $_GET["room"]; }
+      else { echo "Room"; } ?>">
     <button id="setRoom">Join</button>
   </div>
 

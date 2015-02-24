@@ -22,12 +22,12 @@ $checkForPlayerQuery = $connection->prepare(
     WHERE room = ? AND player = ? AND type = \"player\"");
 $addRoomQuery = $connection->prepare(
     "INSERT INTO CurrentState
-    (room, type, id)
-    SELECT ?, \"room\", 1");
+    (room, type, name)
+    SELECT ?, \"room\", 750");
 $addPlayerQuery = $connection->prepare(
     "INSERT INTO CurrentState
-    (room, player, type, imageUrl)
-    SELECT ?, ?, ?, ?");
+    (room, player, imageUrl, ordering, type, name)
+    SELECT ?, ?, ?, ?, \"player\", \"1\"");
 $updatePlayerScoreQuery = $connection->prepare(
     "UPDATE CurrentState SET
     rotation = ?
@@ -77,6 +77,9 @@ $removeQuery = $connection->prepare(
 $removePlayerQuery = $connection->prepare(
     "DELETE FROM CurrentState
     WHERE room = ? AND player = ?");
+$removeRoomQuery = $connection->prepare(
+    "DELETE FROM CurrentState
+    WHERE room = ?");
 $markAsUpdatedQuery = $connection->prepare(
     "INSERT INTO LastRoomUpdate
     (room) SELECT ?");
@@ -222,11 +225,11 @@ else
         $checkForPlayerQuery->close();
         if ($existingCount == 0)
         {
-            $addPlayerQuery->bind_param("ssss",
+            $addPlayerQuery->bind_param("sssi",
                                         $_POST["room"],
                                         $_POST["player"],
-                                        $_POST["type"],
-                                        $_POST["image_url"]);
+                                        $_POST["image_url"],
+                                        $_POST["ordering"]);
             $addPlayerQuery->execute();
             $addPlayerQuery->close();
         }
