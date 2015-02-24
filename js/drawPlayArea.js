@@ -47,6 +47,7 @@ function TableData() {
     this.playerCount = 0;
     this.lastUpdateId = -1;
     this.tableRadius = 750;
+    this.markerHistory = [];
 
     this.setRoom = function (roomName) {
         this.room = roomName;
@@ -390,6 +391,19 @@ function TableData() {
         $('#deckCount').text(deck.length);
     };
     this.createMarker = function (text) {
+        var textFound = false;
+        for (var i = 0; i < this.markerHistory.length; i++) {
+            if(this.markerHistory[i].text === text) {
+                textFound = true;
+                break;
+            }
+        }
+        if (!textFound) {
+            this.markerHistory.push({
+                text: text,
+                ordering: this.markerHistory.length
+            });
+        }
         var newMarker = {
             id: this.player.nextMarkerId,
             text: text,
@@ -1229,6 +1243,26 @@ function PlayAreaSVG() {
 
         cards.exit().remove();
     };
+    this.drawMarkerHistory = function () {
+        var history = d3.select('#markerHistory').selectAll('tr')
+            .data(this.tableData.markerHistory, function (d) {
+                   return d.text;
+               });
+        var newHistory = history.enter().append('tr');
+
+        newHistory.each(function (d) {
+            var playerRow = d3.select(this);
+            playerRow.append('td').html(function (d) { return d.text; });
+            playerRow.append('td').append('button')
+                .classed('insertMarker', true)
+                .html('+')
+                .on('click', function () {
+                    self.tableData.createMarker(d.text);
+                });
+        });
+
+        history.exit().remove();
+    };
     this.resizeSVG = function () {
         // http://stackoverflow.com/a/16265661/225730
         var w = window,
@@ -1478,6 +1512,10 @@ $(document).ready(function initialSetup() {
     $('#settingsHeader').on('click', function showLoadDeckForm() {
         $('#settingsBox').toggle();
     });
+    $('#settingsBox').hide();
+    $('#markerHistoryHeader').on('click', function showLoadDeckForm() {
+        $('#markerHistory').toggle();
+    });
     $('#loadDeck').on('click', function passCSVToTableData() {
         var deckCSV = $('#deckCSV').val();
         mainApp.playAreaSVG.tableData.loadDeckFromCSV(deckCSV);
@@ -1544,6 +1582,7 @@ $(document).ready(function initialSetup() {
     $('#createMarker').on('click', function createMarker() {
         mainApp.playAreaSVG.tableData.createMarker($('#markerText').val());
         mainApp.playAreaSVG.drawMarkers();
+        mainApp.playAreaSVG.drawMarkerHistory();
     });
     $('#resetPlayer').on('click', function resetPlayer() {
         mainApp.playAreaSVG.tableData.resetPlayer();

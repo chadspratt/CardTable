@@ -81,9 +81,11 @@
     <h4>Marker Text:</h4>
     <input id="markerText" type="text" value="+1/+1">
     <button id="createMarker">Create</button>
+    <div id="markerHistoryHeader" class="links">Marker History</div>
+    <table id="markerHistory"></table>
   </div>
 
-  <div id="settingsHeader" class="links">Settings</div>
+  <div id="settingsHeader" class="links">Other Settings</div>
   <div id="settingsBox">
     <div>
       Table Image:
