@@ -27,7 +27,8 @@ function Player(name) {
             if (this.zones.hasOwnProperty(zone) &&
                 zone !== 'deck' &&
                 (zone !== 'hand' ||
-                 this.name === mainApp.playAreaSVG.tableData.playerName)) {
+                 this.name === mainApp.playAreaSVG.tableData.playerName ||
+                 mainApp.playAreaSVG.tableData.playerName === '')) {
                 zoneArray.push(this.zones[zone]);
             }
         }
@@ -68,6 +69,23 @@ function TableData() {
             .property('value', this.player.imageUrl);
         d3.select('#tableImageScale')
             .property('value', this.player.imageScale.toString());
+    };
+    this.addPlayer = function (playerName) {
+        $.post('tableState.php',
+                {
+                    action: 'addPlayer',
+                    room: this.room,
+                    player: playerName,
+                    type: 'player',
+                    // storing score in image_url
+                    image_url: '0',
+                    ordering: this.playerCount
+                },
+                function (data) {
+                    self.lastUpdateId = data.last_update_id;
+                },
+                'json');
+        this.playerCount += 1;
     };
     this.setName = function (playerName) {
         // check if its a different name
@@ -242,13 +260,14 @@ function TableData() {
                     'json');
         }
     };
-    this._dbRemovePlayerObjects = function () {
-        if (this.room !== null && this.player !== null) {
+    this._dbRemovePlayerObjects = function (playerName) {
+        if (this.room !== null) {
+            delete this.players[playerName];
             $.post('tableState.php',
                     {
                         action: 'remove_all',
                         room: this.room,
-                        player: this.playerName
+                        player: playerName
                     },
                     function (data) {
                         self.lastUpdateId = data.last_update_id;
@@ -328,20 +347,7 @@ function TableData() {
                     }
                 }
                 if (!this.players[playerName].hasOwnProperty('score')) {
-                    $.post('tableState.php',
-                            {
-                                action: 'addPlayer',
-                                room: this.room,
-                                player: playerName,
-                                type: 'player',
-                                // storing score in image_url
-                                image_url: '0',
-                                ordering: this.playerCount
-                            },
-                            function (data) {
-                                self.lastUpdateId = data.last_update_id;
-                            },
-                            'json');
+                    this.addPlayer(playerName)
                 }
             }
         }
@@ -350,7 +356,7 @@ function TableData() {
 
     this.loadDeckFromCSV = function (deckCSV) {
         this.deckCSV = deckCSV;
-        this._dbRemovePlayerObjects();
+        this._dbRemovePlayerObjects(this.playerName);
         this.player.zones = {};
         this.player.zones['deck'] = new Zone('deck');
         this.player.zones['deck'].cards = $.csv.toObjects(deckCSV);
@@ -534,8 +540,9 @@ function TableData() {
             i = 0;
         for (var playerName in this.players) {
             if (this.players.hasOwnProperty(playerName)) {
-                if (this.players[playerName].cardCount > 0 ||
-                    this.players[playerName].markers.length > 0) {
+                if (this.players[playerName].name !== '') {
+                // if (this.players[playerName].cardCount > 0 ||
+                //     this.players[playerName].markers.length > 0) {
                     playerArray.push(this.players[playerName]);
                 }
             }
@@ -544,7 +551,8 @@ function TableData() {
             return a.ordering - b.ordering;
         });
         for (i = 0; i < playerArray.length; i++) {
-            if (playerArray[i].name === this.playerName) {
+            if (playerArray[i].name === this.playerName ||
+                this.playerName === '') {
                 var frontPlayers = playerArray.splice(0, i);
                 playerArray = playerArray.concat(frontPlayers);
                 break;
@@ -800,12 +808,12 @@ function PlayAreaSVG() {
                 return d.id;
             })
             .attr('xlink:href', function (d) {
-                if (d.zone !== 'hand' ||
-                    d.playerName === self.tableData.playerName) {
+                // if (d.zone !== 'hand' ||
+                //     d.playerName === self.tableData.playerName) {
                     return d.image_url;
-                } else {
-                    return 'cardback.png';
-                }
+                // } else {
+                //     return 'cardback.png';
+                // }
             })
             .attr('x', function (d, i) {
                 if (!d.hasOwnProperty('x')) {
@@ -843,8 +851,8 @@ function PlayAreaSVG() {
         cards.sort(function (a, b) {
             return a.ordering - b.ordering;
         });
-        cards.on('click.enlarge', self.showEnlargedCard);
-        cards.on('click.buttons', self.showCardButtons);
+        cards.on('click.enlarge', self.drawEnlargedCard);
+        cards.on('click.buttons', self.drawCardButtons);
     };
     this.drawMarkers = function () {
         var playerArray = this.tableData.getPlayerArray();
@@ -903,7 +911,7 @@ function PlayAreaSVG() {
         });
         markers.call(self.drag);
     };
-    this.showEnlargedCard = function (d) {
+    this.drawEnlargedCard = function (d) {
         d3.event.stopPropagation(); // silence other listeners
         var originCard = d3.select(this);
         d.originCard = originCard;
@@ -952,15 +960,15 @@ function PlayAreaSVG() {
             mainApp.enlargedCard.call(self.drag);
             newCardData.exit().remove();
 
-            // mainApp.enlargedCard.on('click.enlarge', self.showEnlargedCard);
+            // mainApp.enlargedCard.on('click.enlarge', self.drawEnlargedCard);
             mainApp.enlargedCard.on('click.enlarge', function () {
                 d3.event.stopPropagation();
             });
-            mainApp.enlargedCard.on('click.buttons', self.showCardButtons);
+            mainApp.enlargedCard.on('click.buttons', self.drawCardButtons);
             // });
         }
     };
-    this.showCardButtons = function (d) {
+    this.drawCardButtons = function (d) {
         d3.event.stopPropagation(); // silence other listeners
         d3.select('#cardButtons').selectAll("*").remove();
         if(self.tableData.playerName === d.playerName)
@@ -1107,7 +1115,7 @@ function PlayAreaSVG() {
     this.drawScoreBoard = function () {
         var playerArray = this.tableData.getPlayerArray();
 
-        var players = d3.select('#scoreBoard').selectAll('tr')
+        var players = d3.select('#scoreBoard tbody').selectAll('tr')
             .data(playerArray,
                   function (d) {
                     return d.name;
@@ -1117,9 +1125,6 @@ function PlayAreaSVG() {
         newPlayers.each(function (d) {
             var playerRow = d3.select(this);
             playerRow.append('td').html(function (d) { return d.name; });
-            playerRow.append('td').append('span')
-                .classed('handCountLabel', true)
-                .html('Hand:');
             playerRow.append('td').append('span')
                 .classed('handCount', true)
                 .html(function () {
@@ -1156,6 +1161,26 @@ function PlayAreaSVG() {
             row.select('.handCount')
                 .html(d.zones['hand'].cards.length);
             });
+
+        players.exit().remove();
+    };
+    this.drawPlayerSelect = function () {
+        var playerArray = this.tableData.getPlayerArray();
+        playerArray.unshift({name: ''});
+
+        var players = d3.select('#playerSelect').selectAll('option')
+            .data(playerArray,
+                  function (d) {
+                    return d.name;
+                });
+        var newPlayers = players.enter().append('option')
+            .html(function (d) {
+                    return d.name;
+                })
+            .property('value',
+                  function (d) {
+                    return d.name;
+                });
 
         players.exit().remove();
     };
@@ -1339,6 +1364,7 @@ function MainApp() {
                                 self.playAreaSVG._drawCards();
                                 self.playAreaSVG.drawMarkers();
                                 self.playAreaSVG.drawScoreBoard();
+                                self.playAreaSVG.drawPlayerSelect();
                             } else {
                                 self.noChangesCount += 1;
                             }
@@ -1470,12 +1496,34 @@ $(document).ready(function initialSetup() {
         mainApp.playAreaSVG.tableData.setRoom($('#roomName').val());
     });
     $('#setPlayer').on('click', function setPlayer() {
-        mainApp.playAreaSVG.tableData.setPlayer($('#playerName').val());
+        var selectedPlayer = d3.select('#playerSelect').property('value');
+        $('#playerName').val(selectedPlayer);
+        mainApp.playAreaSVG.tableData.setPlayer(selectedPlayer);
         mainApp.playAreaSVG.drawTable();
         mainApp.playAreaSVG._drawCards();
         mainApp.playAreaSVG.drawMarkers();
         mainApp.playAreaSVG.drawDeckList();
         // mainApp.playAreaSVG.drawScoreBoard();
+    });
+    $('#addPlayer').on('click', function setPlayer() {
+        var newPlayer = $('#playerName').val();
+        mainApp.playAreaSVG.tableData.setPlayer(newPlayer);
+        mainApp.playAreaSVG.drawTable();
+        mainApp.playAreaSVG._drawCards();
+        mainApp.playAreaSVG.drawMarkers();
+        mainApp.playAreaSVG.drawDeckList();
+        mainApp.playAreaSVG.drawPlayerSelect();
+        mainApp.playAreaSVG.drawScoreBoard();
+        d3.select('#playerSelect').property('value', newPlayer);
+    });
+    $('#removePlayer').on('click', function setPlayer() {
+        var playerName = $('#playerName').val();
+        mainApp.playAreaSVG.tableData._dbRemovePlayerObjects(playerName);
+        mainApp.playAreaSVG.drawTable();
+        mainApp.playAreaSVG._drawCards();
+        mainApp.playAreaSVG.drawMarkers();
+        mainApp.playAreaSVG.drawDeckList();
+        mainApp.playAreaSVG.drawScoreBoard();
     });
     $('#setName').on('click', function setName() {
         mainApp.playAreaSVG.tableData.setName($('#playerName').val());

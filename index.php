@@ -39,10 +39,18 @@
 
   <div id="playerNameBox">
     <h4>Player:</h4>
-    <select id="playerSelect"></select>
-    <input id="playerName" type="text" value="defaultPlayer">
-    <div><button id="setPlayer">Change Player</button></div>
-    <div><button id="setName">Change Name</button></div>
+    <div>
+      <select id="playerSelect"></select>
+      <button id="setPlayer">Set</button>
+    </div>
+    <div>
+      <input id="playerName" type="text" value="">
+    </div>
+    <div>
+      <button id="setName">Rename</button>
+      <button id="addPlayer">Add</button>
+      <button id="removePlayer">Remove</button>
+    </div>
   </div>
 
   <div id="deckBox" class="overlayItem inline">
@@ -106,7 +114,18 @@
   </div>
 </div>
 
-<table id="scoreBoard" class="overlayItem"></table>
+<table id="scoreBoard" class="overlayItem">
+  <thead>
+    <tr>
+      <td>Name</td>
+      <td>Hand</td>
+      <td> </td>
+      <td>Score</td>
+      <td> </td>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
 
 <div id="mouseoverBox" class="overlayItem"></div>
 
