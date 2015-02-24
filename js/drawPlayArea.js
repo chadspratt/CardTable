@@ -394,6 +394,7 @@ function TableData() {
         var textFound = false;
         for (var i = 0; i < this.markerHistory.length; i++) {
             if(this.markerHistory[i].text === text) {
+                this.markerHistory[i].count += 1;
                 textFound = true;
                 break;
             }
@@ -401,9 +402,12 @@ function TableData() {
         if (!textFound) {
             this.markerHistory.push({
                 text: text,
-                ordering: this.markerHistory.length
+                count: 1
             });
         }
+        this.markerHistory.sort(function (a, b) {
+            return b.count - a.count;
+        })
         var newMarker = {
             id: this.player.nextMarkerId,
             text: text,
@@ -1262,6 +1266,7 @@ function PlayAreaSVG() {
         });
 
         history.exit().remove();
+        history.order();
     };
     this.resizeSVG = function () {
         // http://stackoverflow.com/a/16265661/225730
