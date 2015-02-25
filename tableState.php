@@ -77,6 +77,9 @@ $removeQuery = $connection->prepare(
 $removePlayerQuery = $connection->prepare(
     "DELETE FROM CurrentState
     WHERE room = ? AND player = ?");
+$removePlayerObjectsQuery = $connection->prepare(
+    "DELETE FROM CurrentState
+    WHERE room = ? AND player = ? AND type != \"player\"");
 $removeRoomQuery = $connection->prepare(
     "DELETE FROM CurrentState
     WHERE room = ?");
@@ -347,7 +350,15 @@ else
         $removeQuery->execute();
         $removeQuery->close();
     }
-    elseif ($_POST["action"] === "remove_all")
+    elseif ($_POST["action"] === "remove_player_objects")
+    {
+        $removePlayerObjectsQuery->bind_param("ss",
+                                       $_POST["room"],
+                                       $_POST["player"]);
+        $removePlayerObjectsQuery->execute();
+        $removePlayerObjectsQuery->close();
+    }
+    elseif ($_POST["action"] === "remove_player")
     {
         $removePlayerQuery->bind_param("ss",
                                        $_POST["room"],

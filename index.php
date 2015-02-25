@@ -30,60 +30,80 @@
 <div id="motionDisplay" class="overlayItem">dx: dy:</div>
 <div id="motionDisplayCorrected" class="overlayItem">dx: dy:</div>
 
-<div id="gameControls">
+<div id="gameControlsLeft" class="overlayItem">
   <div id="roomNameBox">
-    <h4>Room:</h4>
-    <input id="roomName" type="text" value="<?php
+    Room:
+    <input id="roomName" type="text" size="12" value="<?php
       if (isset($_GET["room"]))
         { echo $_GET["room"]; }
       else { echo "Room"; } ?>">
     <button id="setRoom">Join</button>
   </div>
 
+  <table id="scoreBoard">
+    <thead>
+      <tr>
+        <td> </td>
+        <td>Name</td>
+        <td>Hand</td>
+        <td> </td>
+        <td>Score</td>
+        <td> </td>
+      </tr>
+    </thead>
+
+    <tbody></tbody>
+  </table>
+
   <div id="playerNameBox">
-    <h4>Player:</h4>
-    <div>
+    <div id="setRemoveBox">
       <select id="playerSelect"></select>
-      <button id="setPlayer">Set</button>
-    </div>
-    <div>
-      <input id="playerName" type="text" value="">
-    </div>
-    <div>
-      <button id="setName">Rename</button>
-      <button id="addPlayer">Add</button>
+      <button id="setPlayer">Select</button>
       <button id="removePlayer">Remove</button>
+    </div>
+    <div id="addRenameBox">
+      <input id="playerName" type="text" value="" size="12">
+      <button id="addPlayer">Add</button>
+      <button id="renamePlayer" disabled="disabled">Rename</button>
     </div>
   </div>
 
-  <div id="deckBox" class="overlayItem inline">
-    <H2>Deck (<span id="deckCount">0</span> cards)</H2>
-    <button id="drawCard">Draw</button>
-    <button id="showDeckList">List</button>
-    <button id="shuffleDeck">Shuffle</button>
-    <button id="resetPlayer">Reset</button>
+  <div id="deckBox" class="inline">
+    <div id="deckHeaderBox">
+      <span class="deckHeader">
+        Deck (<span id="deckCount">0</span> cards)
+      </span>
+      <span id="loadDeckHeader" class="links">
+        Load
+      </span>
+    </div>
+
+    <div id="loadDeckBox">
+      <div id="loadDeckForm">
+        <div>Paste csv with these columns:</div>
+        <div>name,image_url,count</div>
+        <div>(case-sensitive, no spaces between fields, any order)</div>
+        <textarea type="text" id="deckCSV" value="" rows="10" cols="33"></textarea>
+        <div><button id="loadDeck">Load</button></div>
+      </div>
+    </div>
+
+    <div id="deckButtonBox">
+      <button id="drawCard">Draw</button>
+      <button id="showDeckList">List</button>
+      <button id="shuffleDeck">Shuffle</button>
+      <button id="resetPlayer">Reset</button>
+    </div>
 
     <div id="deckListBox">
       <select id="deckList" size="15"></select>
       <div><button id="drawSelectedCard">Draw Selected</button></div>
     </div>
-
-    <div id="loadDeckBox">
-      <div id="loadDeckHeader" class="links">Load From CSV</div>
-      <div id="loadDeckForm">
-        <div>Required Columns:</div>
-        <div>name, image_url, count</div>
-        <div> (case-sensitive but any order)</div>
-        <textarea type="text" id="deckCSV" value="" rows="10" cols="25"></textarea>
-        <div><button id="loadDeck">Load</button></div>
-      </div>
-    </div>
   </div>
 
   <div id="createMarkerBox">
-    <h4>Marker Text:</h4>
-    <input id="markerText" type="text" value="+1/+1">
-    <button id="createMarker">Create</button>
+    <input id="markerText" type="text" size="12" value="+1/+1">
+    <button id="createMarker">Create Marker</button>
     <div id="markerHistoryHeader" class="links">Marker History</div>
     <table id="markerHistory"></table>
   </div>
@@ -92,7 +112,7 @@
   <div id="settingsBox">
     <div>
       Table Image:
-      <input id="tableImageUrl" type="text" value="">
+      <input id="tableImageUrl" type="text" size="12" value="">
       <button id="setTableImageUrl">Set</button>
     </div>
     <div>
@@ -102,7 +122,7 @@
     </div>
     <div>
       Marker Size:
-      <input id="markerSize" type="text" size="1" value="3">
+      <input id="markerSize" type="text" size="1" value="5">
       <button id="setMarkerSize">Set</button>
     </div>
     <div>
@@ -118,19 +138,6 @@
     </div>
   </div>
 </div>
-
-<table id="scoreBoard" class="overlayItem">
-  <thead>
-    <tr>
-      <td>Name</td>
-      <td>Hand</td>
-      <td> </td>
-      <td>Score</td>
-      <td> </td>
-    </tr>
-  </thead>
-  <tbody></tbody>
-</table>
 
 <div id="mouseoverBox" class="overlayItem"></div>
 
