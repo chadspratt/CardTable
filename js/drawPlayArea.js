@@ -1605,6 +1605,21 @@ $(document).ready(function initialSetup() {
         mainApp.playAreaSVG.drawScoreBoard();
         mainApp.playAreaSVG.drawMarkerHistory();
     });
+    $('#playerName').on('input', function addPlayer() {
+        // can rename if player is set
+        if (mainApp.playAreaSVG.tableData.playerName !== '') {
+            $('#renamePlayer').attr('disabled', false);
+        } else {
+            $('#renamePlayer').attr('disabled', 'disabled');
+        }
+        // can't rename if new name is already in use, but can select that player
+        if (mainApp.playAreaSVG.tableData.players.hasOwnProperty($('#playerName').val())) {
+            $('#renamePlayer').attr('disabled', 'disabled');
+            $('#addPlayer').text('Select');
+        } else {
+            $('#addPlayer').text('Add');
+        }
+    });
     $('#addPlayer').on('click', function addPlayer() {
         var newPlayer = $('#playerName').val();
         mainApp.playAreaSVG.tableData.addPlayer(newPlayer);
