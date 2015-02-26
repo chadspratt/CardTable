@@ -1164,10 +1164,8 @@ function PlayAreaSVG() {
                 .classed('playerOptionToggle', true)
                 .html('▼')
                 .on('click', function (d) {
-                    $('#playerSelect').val(d.name);
                     $('#playerName').val(d.name);
-                    $('#setRemoveBox').toggle();
-                    $('#addRenameBox').toggle();
+                    $('#playerName').trigger('input');
                 });
             playerRow.append('td').html(function (d) { return d.name; });
             playerRow.append('td').append('span')
@@ -1377,7 +1375,7 @@ function PlayAreaSVG() {
         };
     };
     this.zoomIn = function (pageX, pageY) {
-        var zoomFactor = 1.35;
+        var zoomFactor = 1.1;
         this.scale *= zoomFactor;
         this.viewBox.left += (pageX - this.x) / this.scale * (zoomFactor - 1);
         this.viewBox.top += (pageY - this.y) / this.scale * (zoomFactor - 1);
@@ -1387,7 +1385,7 @@ function PlayAreaSVG() {
         // self.scaleSelectedCard();
     };
     this.zoomOut = function (pageX, pageY) {
-        var zoomFactor = 1 / 1.35;
+        var zoomFactor = 1 / 1.1;
         this.scale *= zoomFactor;
         this.viewBox.left = this.viewBox.left + (pageX - this.x) / this.scale * (zoomFactor - 1);
         this.viewBox.top = this.viewBox.top + (pageY - this.y) / this.scale * (zoomFactor - 1);
@@ -1607,19 +1605,31 @@ $(document).ready(function initialSetup() {
     });
     $('#playerName').on('input', function addPlayer() {
         // can rename if player is set
-        if (mainApp.playAreaSVG.tableData.playerName !== '') {
-            $('#renamePlayer').attr('disabled', false);
+        var playerName = $('#playerName').val();
+        if (playerName === '') {
+            $('#addPlayer').attr('disabled', true);
+            $('#renamePlayer').hide();
+            $('#removePlayer').hide();
         } else {
-            $('#renamePlayer').attr('disabled', 'disabled');
-        }
-        // can't rename if new name is already in use, but can select that player
-        if (mainApp.playAreaSVG.tableData.players.hasOwnProperty($('#playerName').val())) {
-            $('#renamePlayer').attr('disabled', 'disabled');
-            $('#addPlayer').text('Select');
-        } else {
-            $('#addPlayer').text('Add');
+            $('#addPlayer').attr('disabled', false);
+            // can't rename if new name is already in use, but can select that player
+            if (mainApp.playAreaSVG.tableData.players.hasOwnProperty(playerName)) {
+                $('#addPlayer').text('Select');
+                $('#renamePlayer').hide();
+                $('#removePlayer').show();
+            } else {
+                $('#addPlayer').text('Add');
+                $('#renamePlayer').show();
+                $('#removePlayer').hide();
+            }
+            if (mainApp.playAreaSVG.tableData.playerName !== '') {
+                $('#renamePlayer').show();
+            } else {
+                $('#renamePlayer').hide();
+            }
         }
     });
+    $('#playerName').trigger('input');
     $('#addPlayer').on('click', function addPlayer() {
         var newPlayer = $('#playerName').val();
         mainApp.playAreaSVG.tableData.addPlayer(newPlayer);
@@ -1634,22 +1644,20 @@ $(document).ready(function initialSetup() {
     });
     $('#removePlayer').on('click', function removePlayer() {
         var playerName = $('#playerSelect').val();
+        $('#playerSelect').val('');
+        $('#removePlayer').attr('');
         mainApp.playAreaSVG.tableData.dbRemovePlayer(playerName);
         mainApp.playAreaSVG.drawTable();
         mainApp.playAreaSVG._drawCards();
         mainApp.playAreaSVG.drawMarkers();
         mainApp.playAreaSVG.drawDeckList();
         mainApp.playAreaSVG.drawScoreBoard();
-        $('#setRemoveBox').toggle();
-        $('#addRenameBox').toggle();
     });
     $('#renamePlayer').on('click', function renamePlayer() {
         mainApp.playAreaSVG.tableData.renamePlayer($('#playerName').val());
         mainApp.playAreaSVG._drawCards();
         mainApp.playAreaSVG.drawMarkers();
         mainApp.playAreaSVG.drawDeckList();
-        $('#setRemoveBox').toggle();
-        $('#addRenameBox').toggle();
     });
     $('#setTableImageUrl').on('click', function setTableImageUrl() {
         mainApp.playAreaSVG.tableData.setTableImageUrl($('#tableImageUrl').val());

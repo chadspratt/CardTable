@@ -56,16 +56,10 @@
   </table>
 
   <div id="playerNameBox">
-    <div id="setRemoveBox">
-      <select id="playerSelect"></select>
-      <button id="setPlayer">Select</button>
-      <button id="removePlayer">Remove</button>
-    </div>
-    <div id="addRenameBox">
-      <input id="playerName" type="text" value="" size="12">
-      <button id="addPlayer">Add</button>
-      <button id="renamePlayer" disabled="disabled">Rename</button>
-    </div>
+    <input id="playerName" type="text" value="" size="12">
+    <button id="addPlayer" disabled="disabled">Add</button>
+    <button id="renamePlayer">Rename</button>
+    <button id="removePlayer">Remove</button>
   </div>
 
   <div id="deckBox" class="inline">
