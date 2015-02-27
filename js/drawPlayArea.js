@@ -842,12 +842,12 @@ function PlayAreaSVG() {
                 return d.id;
             })
             .attr('xlink:href', function (d) {
-                // if (d.zone !== 'hand' ||
-                //     d.playerName === self.tableData.playerName) {
+                if (d.zone !== 'inPlayFaceDown' ||
+                    d.playerName === self.tableData.playerName) {
                     return d.image_url;
-                // } else {
-                //     return 'cardback.png';
-                // }
+                } else {
+                    return 'cardback.png';
+                }
             })
             .attr('x', function (d, i) {
                 if (!d.hasOwnProperty('x')) {
@@ -1033,6 +1033,13 @@ function PlayAreaSVG() {
                     width: 40,
                     height: 10
                 },
+                playFaceDown: {
+                    text: 'Play Face Down',
+                    x: 19,
+                    y: 50,
+                    width: 62,
+                    height: 10
+                },
                 hand: {
                     text: 'Hand',
                     x: 26,
@@ -1067,6 +1074,7 @@ function PlayAreaSVG() {
             if (d.zone === 'hand') {
                 buttons = [
                     buttonData.play,
+                    buttonData.playFaceDown,
                     buttonData.deckTop,
                     buttonData.deckBottom
                 ];
@@ -1105,6 +1113,10 @@ function PlayAreaSVG() {
                     } else if (d.text === 'Play') {
                         self.tableData.changeCardZone(card,
                                                       'inPlay');
+                        self._drawCards();
+                    } else if (d.text === 'Play Face Down') {
+                        self.tableData.changeCardZone(card,
+                                                      'inPlayFaceDown');
                         self._drawCards();
                     } else if (d.text === 'Hand') {
                         self.tableData.changeCardZone(card,
@@ -1619,14 +1631,16 @@ $(document).ready(function initialSetup() {
                 $('#removePlayer').show();
             } else {
                 $('#addPlayer').text('Add');
-                $('#renamePlayer').show();
+                if (mainApp.playAreaSVG.tableData.playerName !== '') {
+                    $('#renamePlayer').show();
+                }
                 $('#removePlayer').hide();
             }
-            if (mainApp.playAreaSVG.tableData.playerName !== '') {
-                $('#renamePlayer').show();
-            } else {
-                $('#renamePlayer').hide();
-            }
+            // if (mainApp.playAreaSVG.tableData.playerName !== '') {
+            //     $('#renamePlayer').show();
+            // } else {
+            //     $('#renamePlayer').hide();
+            // }
         }
     });
     $('#playerName').trigger('input');
