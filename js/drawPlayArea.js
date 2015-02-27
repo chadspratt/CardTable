@@ -747,12 +747,12 @@ function PlayAreaSVG() {
     });
     this.drawCard = function () {
         this.tableData.drawCard();
-        this._drawCards();
+        this.drawCards();
     };
     this.drawSelectedCard = function () {
         var selectedCardId = d3.select('#deckList').property('value');
         this.tableData.drawCardById(selectedCardId);
-        this._drawCards();
+        this.drawCards();
     };
     this.drawTable = function () {
         var playerArray = this.tableData.getPlayerArray();
@@ -794,7 +794,7 @@ function PlayAreaSVG() {
             });
         players.exit().remove();
     };
-    this._drawCards = function () {
+    this.drawCards = function () {
         var currentPlayer = this.tableData.player;
         if (currentPlayer.zones.hasOwnProperty('deck')) {
             $('#deckCount').text(currentPlayer.zones['deck'].cards.length);
@@ -1085,6 +1085,16 @@ function PlayAreaSVG() {
                     buttonData.rotateRight,
                     buttonData.deckTop,
                     buttonData.unrotate,
+                    buttonData.deckBottom,
+                    buttonData.playFaceDown,
+                ];
+            } else if (d.zone === 'inPlayFaceDown') {
+                buttons = [
+                    buttonData.rotateLeft,
+                    buttonData.play,
+                    buttonData.rotateRight,
+                    buttonData.deckTop,
+                    buttonData.unrotate,
                     buttonData.deckBottom
                 ];
             }
@@ -1096,32 +1106,32 @@ function PlayAreaSVG() {
                 .on('click', function (d) {
                     if (d.text === 'L') {
                         self.tableData.rotateLeft(card);
-                        self._drawCards();
+                        self.drawCards();
                     } else if (d.text === 'R') {
                         self.tableData.rotateRight(card);
-                        self._drawCards();
+                        self.drawCards();
                     } else if (d.text === 'T') {
                         self.tableData.changeCardZone(card,
                                                       'deck',
                                                       'top');
-                        self._drawCards();
+                        self.drawCards();
                     } else if (d.text === 'B') {
                         self.tableData.changeCardZone(card,
                                                       'deck',
                                                       'bottom');
-                        self._drawCards();
+                        self.drawCards();
                     } else if (d.text === 'Play') {
                         self.tableData.changeCardZone(card,
                                                       'inPlay');
-                        self._drawCards();
+                        self.drawCards();
                     } else if (d.text === 'Play Face Down') {
                         self.tableData.changeCardZone(card,
                                                       'inPlayFaceDown');
-                        self._drawCards();
+                        self.drawCards();
                     } else if (d.text === 'Hand') {
                         self.tableData.changeCardZone(card,
                                                       'hand');
-                        self._drawCards();
+                        self.drawCards();
                     } else if (d.text === 'Unrotate All') {
                         self.tableData.unrotatePlayerCards();
                     }
@@ -1460,7 +1470,7 @@ function MainApp() {
                                 self.noChangesCount = 0;
                                 self.playAreaSVG.tableData.processRoomState(data);
                                 self.playAreaSVG.drawTable();
-                                self.playAreaSVG._drawCards();
+                                self.playAreaSVG.drawCards();
                                 self.playAreaSVG.drawMarkers();
                                 self.playAreaSVG.drawScoreBoard();
                                 self.playAreaSVG.drawPlayerSelect();
@@ -1609,7 +1619,7 @@ $(document).ready(function initialSetup() {
         $('#playerName').val(selectedPlayer);
         mainApp.playAreaSVG.tableData.setPlayer(selectedPlayer);
         mainApp.playAreaSVG.drawTable();
-        mainApp.playAreaSVG._drawCards();
+        mainApp.playAreaSVG.drawCards();
         mainApp.playAreaSVG.drawMarkers();
         mainApp.playAreaSVG.drawDeckList();
         mainApp.playAreaSVG.drawScoreBoard();
@@ -1649,7 +1659,7 @@ $(document).ready(function initialSetup() {
         mainApp.playAreaSVG.tableData.addPlayer(newPlayer);
         mainApp.playAreaSVG.tableData.setPlayer(newPlayer);
         mainApp.playAreaSVG.drawTable();
-        mainApp.playAreaSVG._drawCards();
+        mainApp.playAreaSVG.drawCards();
         mainApp.playAreaSVG.drawMarkers();
         mainApp.playAreaSVG.drawDeckList();
         mainApp.playAreaSVG.drawPlayerSelect();
@@ -1662,14 +1672,14 @@ $(document).ready(function initialSetup() {
         $('#removePlayer').attr('');
         mainApp.playAreaSVG.tableData.dbRemovePlayer(playerName);
         mainApp.playAreaSVG.drawTable();
-        mainApp.playAreaSVG._drawCards();
+        mainApp.playAreaSVG.drawCards();
         mainApp.playAreaSVG.drawMarkers();
         mainApp.playAreaSVG.drawDeckList();
         mainApp.playAreaSVG.drawScoreBoard();
     });
     $('#renamePlayer').on('click', function renamePlayer() {
         mainApp.playAreaSVG.tableData.renamePlayer($('#playerName').val());
-        mainApp.playAreaSVG._drawCards();
+        mainApp.playAreaSVG.drawCards();
         mainApp.playAreaSVG.drawMarkers();
         mainApp.playAreaSVG.drawDeckList();
     });
@@ -1690,7 +1700,7 @@ $(document).ready(function initialSetup() {
     });
     $('#resetPlayer').on('click', function resetPlayer() {
         mainApp.playAreaSVG.tableData.resetPlayer();
-        mainApp.playAreaSVG._drawCards();
+        mainApp.playAreaSVG.drawCards();
         mainApp.playAreaSVG.drawMarkers();
         mainApp.playAreaSVG.drawDeckList();
     });
