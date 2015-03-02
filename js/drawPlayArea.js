@@ -718,8 +718,8 @@ function PlayAreaSVG() {
                 markerText = drugObject.select('text');
             markerRect.attr('x', d.x)
                 .attr('y', d.y);
-            markerText.attr('x', d.x + 3)
-                .attr('y', d.y + 26);
+            markerText.attr('x', d.x + self.markerSize * 1.5)
+                .attr('y', d.y + self.markerSize * 14);
         } else {
             var imgCenterX = d.x + d.width / 2,
                 imgCenterY = d.y + d.height / 2;
@@ -933,15 +933,15 @@ function PlayAreaSVG() {
                 // return d.x + (2 / self.scale);
             })
             .attr('y', function (d) {
-                return d.y + self.markerSize * 16;
+                return d.y + self.markerSize * 14;
                 // return d.y + (18 / self.scale);
             });
 
         markers.each(function (d) {
             var textSize = d3.select(this).select('text').node().getBBox();
             d3.select(this).select('rect')
-                .attr("width", textSize.width + 4)
-                .attr("height", textSize.height + 4);
+                .attr("width", textSize.width + self.markerSize * 3.5)
+                .attr("height", textSize.height - self.markerSize * 1.2);
         });
         markers.call(self.drag);
     };
@@ -1606,6 +1606,7 @@ $(document).ready(function initialSetup() {
         mainApp.playAreaSVG.tableData.shuffleDeck();
     });
     $('#drawCard').on('click', function drawCard() {
+        d3.select('#enlargedCard').selectAll("*").remove();
         mainApp.playAreaSVG.drawCard();
     });
     $('#drawSelectedCard').on('click', function drawCard() {

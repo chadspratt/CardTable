@@ -27,9 +27,9 @@
 </svg>
 
 <div id="coordDisplay" class="overlayItem">x: y:</div>
-<div id="motionDisplay" class="overlayItem">dx: dy:</div>
+<!-- <div id="motionDisplay" class="overlayItem">dx: dy:</div>
 <div id="motionDisplayCorrected" class="overlayItem">dx: dy:</div>
-
+ -->
 <div id="gameControlsLeft" class="overlayItem">
   <div id="roomNameBox">
     Room:
@@ -90,8 +90,8 @@
     </div>
 
     <div id="deckListBox">
-      <select id="deckList" size="15"></select>
       <div><button id="drawSelectedCard">Draw Selected</button></div>
+      <select id="deckList" size="15"></select>
     </div>
   </div>
 
