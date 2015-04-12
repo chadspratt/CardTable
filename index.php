@@ -27,9 +27,7 @@
 </svg>
 
 <div id="coordDisplay" class="overlayItem">x: y:</div>
-<!-- <div id="motionDisplay" class="overlayItem">dx: dy:</div>
-<div id="motionDisplayCorrected" class="overlayItem">dx: dy:</div>
- -->
+
 <div id="gameControlsLeft" class="overlayItem">
   <div id="roomNameBox">
     Room:
@@ -40,57 +38,62 @@
     <button id="setRoom">Join</button>
   </div>
 
-  <table id="scoreBoard">
-    <thead>
-      <tr>
-        <td> </td>
-        <td>Name</td>
-        <td>Hand</td>
-        <td> </td>
-        <td>Score</td>
-        <td> </td>
-      </tr>
-    </thead>
+  <div id="playerBox">
+    <table id="scoreBoard">
+      <h4>Players</h4>
 
-    <tbody></tbody>
-  </table>
+      <thead>
+        <tr>
+          <td>Name</td>
+          <td>Hand</td>
+          <td> </td>
+          <td>Score</td>
+          <td> </td>
+          <td> </td>
+        </tr>
+      </thead>
 
-  <div id="playerNameBox">
-    <input id="playerName" type="text" value="" size="12">
-    <button id="addPlayer" disabled="disabled">Add</button>
-    <button id="renamePlayer">Rename</button>
-    <button id="removePlayer">Remove</button>
+      <tbody></tbody>
+    </table>
+
+    <span id="addPlayerHeader" class="links">Add Player</span>
+
+    <div id="addPlayerBox">
+      Name:<input id="playerName" type="text" value="" size="12">
+      <button id="addPlayer">Add Player</button>
+    </div>
   </div>
 
-  <div id="deckBox" class="inline">
-    <div id="deckHeaderBox">
-      <span class="deckHeader">
-        Deck (<span id="deckCount">0</span> cards)
-      </span>
-      <span id="loadDeckHeader" class="links">
-        Load
-      </span>
-    </div>
+  <div id="deckBox">
+    <h4>Decks</h4>
+    <table id="deckTable">
+      <thead>
+        <tr>
+          <td>Name</td>
+          <td>Count</td>
+          <td> </td>
+          <td> </td>
+          <td> </td>
+        </tr>
+      </thead>
 
-    <div id="loadDeckBox">
-      <div id="loadDeckForm">
-        <div>Paste csv with these columns:</div>
-        <div>name,image_url,count</div>
-        <div>(case-sensitive, no spaces between fields, any order)</div>
-        <textarea type="text" id="deckCSV" value="" rows="10" cols="33"></textarea>
-        <div><button id="loadDeck">Load</button></div>
-      </div>
-    </div>
+      <tbody></tbody>
+    </table>
 
-    <div id="deckButtonBox">
-      <button id="drawCard">Draw</button>
-      <button id="showDeckList">List</button>
-      <button id="shuffleDeck">Shuffle</button>
-      <button id="resetPlayer">Reset</button>
+    <span id="addDeckHeader" class="links">Add Deck</span>
+
+    <div id="addDeckBox">
+      <div>Deck name:<input id="deckName" type="text" value="" size="12"></div>
+      <div>Shared <input id="newDeckIsShared" type="checkbox"></div>
+      <div>Paste csv with these columns:</div>
+      <div>name,image_url,count</div>
+      <div>(case-sensitive, no spaces between fields, any order)</div>
+      <textarea type="text" id="deckCSV" value="" rows="10" cols="33"></textarea>
+      <div><button id="addDeck">Add Deck</button></div>
     </div>
 
     <div id="deckListBox">
-      <div><button id="drawSelectedCard">Draw Selected</button></div>
+      <div><button id="drawSelectedCard">Draw Selected</button><button id="hideCardList">Hide List</button></div>
       <select id="deckList" size="15"></select>
     </div>
   </div>
@@ -103,27 +106,32 @@
   </div>
 
   <div id="settingsHeader" class="links">Other Settings</div>
+
   <div id="settingsBox">
     <div>
       Table Image:
       <input id="tableImageUrl" type="text" size="12" value="">
       <button id="setTableImageUrl">Set</button>
     </div>
+
     <div>
-      Image Scale:<input id="tableImageScale" type="text" size="1" value="1" />
+      Image Scale:<input id="tableImageScale" type="text" size="1" value="1">
       Distance:<input id="tableDistance" type="text" size="1" value="750">
       <button id="setTableScaleAndDistance">Set</button>
     </div>
+
     <div>
       Marker Size:
       <input id="markerSize" type="text" size="1" value="5">
       <button id="setMarkerSize">Set</button>
     </div>
+
     <div>
       Enlarged Card Size:
       <input id="cardSize" type="text" size="1" value="1">
       <button id="setCardSize">Set</button>
     </div>
+
     <div>
       Deck Deal Point:
       x<input id="deckDealX" type="text" size="1" value="100">
@@ -133,7 +141,23 @@
   </div>
 </div>
 
-<div id="mouseoverBox" class="overlayItem"></div>
+<div id="playerActionBox" class="overlayItem actionBox">
+  <div id="selectPlayer">Select</div>
+  <div id="resetPlayer">Reset</div>
+  <div id="renamePlayer">Rename</div>
+  <div id="removePlayer" class="deleteItem">Remove</div>
+  <div id="movePlayerUp">Move Up</div>
+  <div id="movePlayerDown">Move Down</div>
+</div>
+
+<div id="deckActionBox" class="overlayItem actionBox">
+  <div id="shuffleDeck">Shuffle</div>
+  <div id="listDeck">List</div>
+  <div id="returnCardsToDeck">Return Cards</div>
+  <div id="removeDeck" class="deleteItem">Remove</div>
+  <div id="deckIsShared">Shared<input type="checkbox"></div>
+  <div id="deckIsLocked">Locked<input type="checkbox"></div>
+</div>
 
 </body>
 </html>

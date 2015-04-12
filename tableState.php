@@ -1,95 +1,45 @@
 <?php
 session_start();
-// make a singleton to store the connection and stuff
-require_once "../../db_connect/cards.inc";
+if (!isset($_SESSION["lastUpdateId"]))
+{
+    $_SESSION["lastUpdateId"] = -1;
+}
+session_write_close();
+// require_once "../../db_connect/cards.inc";
+// require_once "php/room.php";
 
-$connection = GetDatabaseConnection();
-$getStateQuery = $connection->prepare(
-    "SELECT player, zone, type, id, name, imageUrl, xPos, yPos, rotation, ordering
-    FROM CurrentState
-    WHERE room = ?");
-$addQuery = $connection->prepare(
-    "INSERT INTO CurrentState
-    (room, player, zone, type, id, name, imageUrl, xPos, yPos)
-    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?");
-$checkForRoomQuery = $connection->prepare(
-    "SELECT COUNT(room)
-    FROM CurrentState
-    WHERE room = ? AND type = \"room\"");
-$checkForPlayerQuery = $connection->prepare(
-    "SELECT COUNT(player)
-    FROM CurrentState
-    WHERE room = ? AND player = ? AND type = \"player\"");
-$addRoomQuery = $connection->prepare(
-    "INSERT INTO CurrentState
-    (room, type, name)
-    SELECT ?, \"room\", 750");
-$addPlayerQuery = $connection->prepare(
-    "INSERT INTO CurrentState
-    (room, player, imageUrl, ordering, type, name)
-    SELECT ?, ?, ?, ?, \"player\", \"1\"");
-$updatePlayerScoreQuery = $connection->prepare(
-    "UPDATE CurrentState SET
-    rotation = ?
-    WHERE room = ? AND player = ? AND type = \"player\"");
-$updateTableImageUrlQuery = $connection->prepare(
-    "UPDATE CurrentState SET
-    imageUrl = ?
-    WHERE room = ? AND player = ? AND type = \"player\"");
-$updateTableImageScaleQuery = $connection->prepare(
-    "UPDATE CurrentState SET
-    name = ?
-    WHERE room = ? AND player = ? AND type = \"player\"");
-$updateTableImageDistanceQuery = $connection->prepare(
-    "UPDATE CurrentState SET
-    name = ?
-    WHERE room = ? AND type = \"room\"");
-$updateDeckDealPointQuery = $connection->prepare(
-    "UPDATE CurrentState SET
-    xPos = ?, yPos = ?
-    WHERE room = ? AND player = ? AND type = \"player\"");
-$updatePlayerNameQuery = $connection->prepare(
-    "UPDATE CurrentState SET
-    player = ?
-    WHERE room = ? AND player = ?");
-$updateQuery = $connection->prepare(
-    "UPDATE CurrentState SET
-    zone = ?, xPos = ?, yPos = ?, rotation = ?, ordering = ?
-    WHERE room = ? AND player = ? AND type = ? AND id = ?");
-$updateDeckOrderQuery = $connection->prepare(
-    "UPDATE CurrentState SET
-    ordering = ?
-    WHERE room = ? AND player = ? AND id = ? AND zone = 'deck'");
-$resetDeckQuery = $connection->prepare(
-    "UPDATE CurrentState SET
-    zone = \"deck\", xPos = ?, yPos = ?, rotation = 0, ordering = 0
-    WHERE room = ? AND player = ? AND type = \"card\"");
-$unrotatePlayerCardsQuery = $connection->prepare(
-    "UPDATE CurrentState SET
-    rotation = 0
-    WHERE room = ? AND player = ? AND type = \"card\"");
-$resetMarkersQuery = $connection->prepare(
-    "DELETE FROM CurrentState
-    WHERE room = ? AND player = ? AND type = \"marker\"");
-$removeQuery = $connection->prepare(
-    "DELETE FROM CurrentState
-    WHERE room = ? AND player = ? AND type = ? AND id = ?");
-$removePlayerQuery = $connection->prepare(
-    "DELETE FROM CurrentState
-    WHERE room = ? AND player = ?");
-$removePlayerObjectsQuery = $connection->prepare(
-    "DELETE FROM CurrentState
-    WHERE room = ? AND player = ? AND type != \"player\"");
-$removeRoomQuery = $connection->prepare(
-    "DELETE FROM CurrentState
-    WHERE room = ?");
-$markAsUpdatedQuery = $connection->prepare(
-    "INSERT INTO LastRoomUpdate
-    (room) SELECT ?");
-$checkForUpdateQuery = $connection->prepare(
-    "SELECT id FROM LastRoomUpdate
-    WHERE room = ? AND id > ?
-    ORDER BY id DESC");
+// $connection = GetDatabaseConnection();
+// $updateQuery = $connection->prepare(
+//     "UPDATE CurrentState SET
+//     zone = ?, xPos = ?, yPos = ?, rotation = ?, ordering = ?
+//     WHERE room = ? AND player = ? AND type = ? AND id = ?");
+// $updateDeckOrderQuery = $connection->prepare(
+//     "UPDATE CurrentState SET
+//     ordering = ?
+//     WHERE room = ? AND player = ? AND id = ? AND zone = 'deck'");
+// $resetDeckQuery = $connection->prepare(
+//     "UPDATE CurrentState SET
+//     zone = \"deck\", xPos = ?, yPos = ?, rotation = 0, ordering = 0
+//     WHERE room = ? AND player = ? AND type = \"card\"");
+// $unrotatePlayerCardsQuery = $connection->prepare(
+//     "UPDATE CurrentState SET
+//     rotation = 0
+//     WHERE room = ? AND player = ? AND type = \"card\"");
+// $resetMarkersQuery = $connection->prepare(
+//     "DELETE FROM CurrentState
+//     WHERE room = ? AND player = ? AND type = \"marker\"");
+// $removeQuery = $connection->prepare(
+//     "DELETE FROM CurrentState
+//     WHERE room = ? AND player = ? AND type = ? AND id = ?");
+// $removePlayerQuery = $connection->prepare(
+//     "DELETE FROM CurrentState
+//     WHERE room = ? AND player = ?");
+// $removePlayerObjectsQuery = $connection->prepare(
+//     "DELETE FROM CurrentState
+//     WHERE room = ? AND player = ? AND type != \"player\"");
+// $removeRoomQuery = $connection->prepare(
+//     "DELETE FROM CurrentState
+//     WHERE room = ?");
 
 // for debugging
 if ($_SERVER['REQUEST_METHOD'] === 'GET')
@@ -98,280 +48,277 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET')
 }
 // var_dump($_POST);
 
-if ($_POST["action"] === "get_state")
+if (isset($_POST["jsonArguments"]))
 {
-    $checkForUpdateQuery->bind_param("si",
-                                     $room,
-                                     $last_update_id);
-    $_SESSION["room"] = $_POST["room"];
-    $_SESSION["last_update_id"] = $_POST["last_update_id"];
-    $room = $_SESSION["room"];
-    $last_update_id = $_SESSION["last_update_id"];
-    session_write_close();
-    // wait for new data
-    $totalTimeSlept = 0;
-    while (true)
-    {
-        $checkForUpdateQuery->execute();
-        $checkForUpdateQuery->bind_result($changeId);
-        if ($checkForUpdateQuery->fetch())
-        {
-            $checkForUpdateQuery->close();
-            break;
-        }
-        // handle case of new rooms with no updates
-        elseif ($last_update_id == "-1")
-        {
-            $checkForUpdateQuery->close();
-            $markAsUpdatedQuery->bind_param("s", $_POST["room"]);
-            $markAsUpdatedQuery->execute();
-            $lastUpdateId = $connection->insert_id;
-            $markAsUpdatedQuery->close();
-            $connection->close();
-            echo '{"last_update_id":"$lastUpdateId"}';
-            echo json_encode(array("change_id" => $lastUpdateId,
-                                   "results" => []));
-            return;
-        }
-        $totalTimeSlept += 0.2;
-        // max wait time
-        if ($totalTimeSlept > 60)
-        {
-            $checkForUpdateQuery->close();
-            $connection->close();
-            echo '{"no_changes":"true"}';
-            return;
-        }
-        usleep(200000);
-        session_start();
-        // just end and wait for a resend if room changes
-        if ($room !== $_SESSION["room"])
-        {
-            session_write_close();
-            echo '{"no_changes":"true"}';
-            return;
-        }
-        session_write_close();
+    $actionArray = json_decode($_POST["jsonArguments"]);
+    for ($i=0; $i < count($actionArray); $i++) {
+        ProcessRequest($actionArray[$i]);
     }
-
-    $getStateQuery->bind_param("s", $_POST["room"]);
-    $getStateQuery->execute();
-    $getStateQuery->bind_result($player, $zone, $type, $id, $name, $imageUrl,
-                                $xPos, $yPos, $rotation, $ordering);
-    $results = [];
-    while ($getStateQuery->fetch())
-    {
-        $row = [
-            "player" => $player,
-            "zone" => $zone,
-            "type" => $type,
-            "id" => $id,
-            "name" => $name,
-            "imageUrl" => $imageUrl,
-            "xPos" => $xPos,
-            "yPos" => $yPos,
-            "rotation" => $rotation,
-            "ordering" => $ordering
-        ];
-        array_push($results, $row);
-    }
-    echo json_encode(array("change_id" => $changeId,
-                           "results" => $results));
 }
 else
 {
-    if ($_POST["action"] === "change_room")
-    {
-        $_SESSION["room"] = $_POST["room"];
-        $_SESSION["last_update_id"] = -1;
-        session_write_close();
-        $checkForRoomQuery->bind_param("s", $_POST["room"]);
-
-        $checkForRoomQuery->execute();
-        $checkForRoomQuery->bind_result($existingCount);
-        $checkForRoomQuery->fetch();
-        $checkForRoomQuery->close();
-        if ($existingCount == 0)
-        {
-            $addRoomQuery->bind_param("s", $_POST["room"]);
-            $addRoomQuery->execute();
-            $addRoomQuery->close();
-        }
-    }
-    elseif ($_POST["action"] === "add")
-    {
-        for ($i=0; $i < count($_POST["id"]); $i++)
-        {
-            $addQuery->bind_param("ssssissii",
-                                  $_POST["room"],
-                                  $_POST["player"],
-                                  $_POST["zone"],
-                                  $_POST["type"],
-                                  $_POST["id"][$i],
-                                  $_POST["name"][$i],
-                                  $_POST["image_url"][$i],
-                                  $_POST["x_pos"][$i],
-                                  $_POST["y_pos"][$i]);
-            $addQuery->execute();
-        }
-        $addQuery->close();
-    }
-    elseif ($_POST["action"] === "addPlayer")
-    {
-        $checkForPlayerQuery->bind_param("ss",
-                                    $_POST["room"],
-                                    $_POST["player"]);
-
-        $checkForPlayerQuery->execute();
-        $checkForPlayerQuery->bind_result($existingCount);
-        $checkForPlayerQuery->fetch();
-        $checkForPlayerQuery->close();
-        if ($existingCount == 0)
-        {
-            $addPlayerQuery->bind_param("sssi",
-                                        $_POST["room"],
-                                        $_POST["player"],
-                                        $_POST["image_url"],
-                                        $_POST["ordering"]);
-            $addPlayerQuery->execute();
-            $addPlayerQuery->close();
-        }
-    }
-    elseif ($_POST["action"] === "update_table_image_url")
-    {
-        $updateTableImageUrlQuery->bind_param("sss",
-                                              $_POST["image_url"],
-                                              $_POST["room"],
-                                              $_POST["player"]);
-        $updateTableImageUrlQuery->execute();
-        $updateTableImageUrlQuery->close();
-    }
-    elseif ($_POST["action"] === "update_table_image_scale_and_distance")
-    {
-        $updateTableImageScaleQuery->bind_param("sss",
-                                                $_POST["image_scale"],
-                                                $_POST["room"],
-                                                $_POST["player"]);
-        $updateTableImageScaleQuery->execute();
-        $updateTableImageScaleQuery->close();
-        $updateTableImageDistanceQuery->bind_param("ss",
-                                                   $_POST["image_distance"],
-                                                   $_POST["room"]);
-        $updateTableImageDistanceQuery->execute();
-        $updateTableImageDistanceQuery->close();
-    }
-    elseif ($_POST["action"] === "set_deck_deal_point")
-    {
-        $updateDeckDealPointQuery->bind_param("iiss",
-                                              $_POST["x"],
-                                              $_POST["y"],
-                                              $_POST["room"],
-                                              $_POST["player"]);
-        $updateDeckDealPointQuery->execute();
-        $updateDeckDealPointQuery->close();
-    }
-    elseif ($_POST["action"] === "updatePlayerScore")
-    {
-        $updatePlayerScoreQuery->bind_param("iss",
-                                            $_POST["rotation"],
-                                            $_POST["room"],
-                                            $_POST["player"]);
-        $updatePlayerScoreQuery->execute();
-        $updatePlayerScoreQuery->close();
-    }
-    elseif ($_POST["action"] === "updatePlayerName")
-    {
-        $updatePlayerNameQuery->bind_param("sss",
-                                           $_POST["new_player"],
-                                           $_POST["room"],
-                                           $_POST["old_player"]);
-        $updatePlayerNameQuery->execute();
-        $updatePlayerNameQuery->close();
-    }
-    elseif ($_POST["action"] === "update")
-    {
-        $updateQuery->bind_param("siiiisssi",
-                                 $_POST["zone"],
-                                 $_POST["x_pos"],
-                                 $_POST["y_pos"],
-                                 $_POST["rotation"],
-                                 $_POST["ordering"],
-                                 $_POST["room"],
-                                 $_POST["player"],
-                                 $_POST["type"],
-                                 $_POST["id"]);
-        $updateQuery->execute();
-        $updateQuery->close();
-    }
-    elseif ($_POST["action"] === "update_deck_order")
-    {
-        for ($i=0; $i < count($_POST["id"]); $i++)
-        {
-            $updateDeckOrderQuery->bind_param("issi",
-                                  $_POST["ordering"][$i],
-                                  $_POST["room"],
-                                  $_POST["player"],
-                                  $_POST["id"][$i]);
-            $updateDeckOrderQuery->execute();
-        }
-        $updateDeckOrderQuery->close();
-    }
-    elseif ($_POST["action"] === "reset_player")
-    {
-        $resetDeckQuery->bind_param("iiss",
-                                    $_POST["x"],
-                                    $_POST["y"],
-                                    $_POST["room"],
-                                    $_POST["player"]);
-        $resetDeckQuery->execute();
-        $resetDeckQuery->close();
-
-        $resetMarkersQuery->bind_param("ss",
-                                       $_POST["room"],
-                                       $_POST["player"]);
-        $resetMarkersQuery->execute();
-        $resetMarkersQuery->close();
-    }
-    elseif ($_POST["action"] === "unrotate_player_cards")
-    {
-        $unrotatePlayerCardsQuery->bind_param("ss",
-                                              $_POST["room"],
-                                              $_POST["player"]);
-        $unrotatePlayerCardsQuery->execute();
-        $unrotatePlayerCardsQuery->close();
-    }
-    elseif ($_POST["action"] === "remove")
-    {
-        $removeQuery->bind_param("sssi",
-                                 $_POST["room"],
-                                 $_POST["player"],
-                                 $_POST["type"],
-                                 $_POST["id"]);
-        $removeQuery->execute();
-        $removeQuery->close();
-    }
-    elseif ($_POST["action"] === "remove_player_objects")
-    {
-        $removePlayerObjectsQuery->bind_param("ss",
-                                       $_POST["room"],
-                                       $_POST["player"]);
-        $removePlayerObjectsQuery->execute();
-        $removePlayerObjectsQuery->close();
-    }
-    elseif ($_POST["action"] === "remove_player")
-    {
-        $removePlayerQuery->bind_param("ss",
-                                       $_POST["room"],
-                                       $_POST["player"]);
-        $removePlayerQuery->execute();
-        $removePlayerQuery->close();
-    }
-
-    $markAsUpdatedQuery->bind_param("s", $_POST["room"]);
-    $markAsUpdatedQuery->execute();
-    $lastUpdateId = $connection->insert_id;
-    echo "{\"last_update_id\":\"{$lastUpdateId}\"}";
+    ProcessRequest($_POST);
 }
+function ProcessRequest($args)
+{
+    require_once "../../db_connect/cards.inc";
+    $connection = GetDatabaseConnection();
 
-$connection->close();
+    if ($args["action"] === "get_state")
+    {
+        session_start();
+        if (isset($args["roomName"]))
+        {
+            $roomName = $args["roomName"];
+        }
+        else
+        {
+            $roomName = $_SESSION["roomName"];
+        }
+
+        if (isset($args["lastUpdateId"]))
+        {
+            $_SESSION["lastUpdateId"] = $args["lastUpdateId"];
+        }
+        $lastUpdateId = $_SESSION["lastUpdateId"];
+        session_write_close();
+
+        $checkForUpdateQuery = $connection->prepare(
+            "SELECT id FROM LastRoomUpdate
+            WHERE room = ? AND id > ?
+            ORDER BY id DESC");
+        $checkForUpdateQuery->bind_param("si",
+                                         $roomName,
+                                         $lastUpdateId);
+
+        $totalTimeSlept = 0;
+        $changeDetected = false;
+        // wait for new data
+        while ($totalTimeSlept < 60)
+        {
+            $checkForUpdateQuery->execute();
+            $checkForUpdateQuery->bind_result($changeId);
+            if ($checkForUpdateQuery->fetch())
+            {
+                $changeDetected = true;
+                break;
+            }
+
+            $totalTimeSlept += 0.2;
+            usleep(200000);
+
+            session_start();
+            if ($roomName !== $_SESSION["roomName"])
+            {
+                $roomName = $_SESSION["roomName"];
+                $lastUpdateId = -1;
+            }
+            session_write_close();
+        }
+
+        $checkForUpdateQuery->close();
+
+        if ($changeDetected)
+        {
+            session_start();
+            $_SESSION["lastUpdateId"] = $changeId;
+            session_write_close();
+            require_once 'php/room.php';
+            $roomState = Room::GetFullStateFromRoomName($roomName);
+            echo json_encode(array("change_id" => $changeId,
+                                   "results" => $roomState));
+        }
+        else
+        {
+            echo '{"no_changes":"true"}';
+        }
+    }
+    else
+    {
+        require_once 'php/room.php';
+        require_once 'php/player.php';
+        require_once 'php/deck.php';
+        require_once 'php/card.php';
+        require_once 'php/marker.php';
+
+        // allow for less coupled api calls that don't use session
+        if (isset($args["roomId"]))
+        {
+            $roomId = $args["roomId"];
+        }
+        elseif (isset($args["roomName"]))
+        {
+            $roomId = Room::GetRoomId($args["roomName"]);
+        }
+        else
+        {
+            session_start();
+            $roomId = $_SESSION["roomId"];
+            session_write_close();
+        }
+
+        if ($args["action"] === "set_room")
+        {
+            session_start();
+            $_SESSION["roomId"] = Room::GetRoomId($args["roomName"], true);
+            $_SESSION["roomName"] = $args["roomName"];
+            $_SESSION["lastUpdateId"] = -1;
+            session_write_close();
+        }
+        elseif ($args["action"] === "add_player")
+        {
+            Player::AddPlayer($roomId, $args["playerName"]);
+        }
+        elseif ($args["action"] === "update_player_name")
+        {
+            Player::UpdateName($args["playerId"],
+                               $args["newName"]);
+        }
+        elseif ($args["action"] === "add_deck")
+        {
+
+            Deck::AddDeck($roomId,
+                          $args["deckName"],
+                          $args["ownerId"],
+                          $args["cardNames"],
+                          $args["cardImageUrls"]);
+        }
+        elseif ($args["action"] === "update_table_image_url")
+        {
+            Player::UpdateTableImage($args["playerId"],
+                                     $args["imageUrl"]);
+        }
+        elseif ($args["action"] === "update_table_image_scale_and_distance")
+        {
+            Room::UpdateTableRadius($roomId, $args["imageDistance"]);
+            Player::UpdateTableImageScale($args["playerId"],
+                                          $args["imageScale"]);
+        }
+        elseif ($args["action"] === "set_deck_deal_point")
+        {
+            Player::UpdateDeckDealPoint($args["playerId"],
+                                        $args["x"],
+                                        $args["y"]);
+        }
+        elseif ($args["action"] === "update_player_score")
+        {
+            Player::UpdateScore($args["playerId"],
+                                $args["score"]);
+        }
+        elseif ($args["action"] === "draw_card")
+        {
+            Card::DrawCard($args["deckId"],
+                           $args["playerId"]);
+        }
+        elseif ($args["action"] === "update_card")
+        {
+            Card::UpdateCard($args["cardId"],
+                             $args["zone"],
+                             $args["playerId"],
+                             $args["x"],
+                             $args["y"],
+                             $args["ordering"]);
+        }
+        elseif ($args["action"] === "update_card_zone")
+        {
+            Card::MoveToZone($args["cardId"],
+                             $args["playerId"],
+                             $args["zone"],
+                             $args["topOrBottom"]);
+        }
+        elseif ($args["action"] === "update_card_geometry")
+        {
+            Card::UpdateGeometry($args["id"],
+                                 $args["x"],
+                                 $args["y"],
+                                 $args["rotation"],
+                                 $args["ordering"]);
+        }
+        elseif ($args["action"] === "update_card_rotation")
+        {
+            Card::UpdateRotation($args["id"],
+                                 $args["rotation"]);
+        }
+        elseif ($args["action"] === "add_marker")
+        {
+            Marker::AddMarker($args["playerId"],
+                              $args["text"],
+                              $args["x"],
+                              $args["y"],
+                              $args["color"]);
+        }
+        elseif ($args["action"] === "update_marker_geometry")
+        {
+            Marker::UpdateGeometry($args["id"],
+                                   $args["x"],
+                                   $args["y"]);
+        }
+        elseif ($args["action"] === "shuffle_deck")
+        {
+            Deck::Shuffle($args["deckId"]);
+        }
+        elseif ($args["action"] === "return_cards_to_deck")
+        {
+            Deck::ReturnAllCards($args["deckId"]);
+        }
+        elseif ($args["action"] === "remove_deck")
+        {
+            Deck::Remove($args["deckId"]);
+        }
+        elseif ($args["action"] === "update_deck_owner")
+        {
+            Deck::UpdateOwner($args["deckId"],
+                              $args["ownerId"]);
+        }
+        elseif ($args["action"] === "reset_player")
+        {
+            Player::Reset($args["playerId"]);
+        }
+        elseif ($args["action"] === "unrotate_player_cards")
+        {
+            Card::UnrotatePlayerCards($args["playerId"]);
+        }
+        elseif ($args["action"] === "remove")
+        {
+            $removeQuery->bind_param("sssi",
+                                     $args["room"],
+                                     $args["playerName"],
+                                     $args["type"],
+                                     $args["id"]);
+            $removeQuery->execute();
+            $removeQuery->close();
+        }
+        elseif ($args["action"] === "remove_player_objects")
+        {
+            $removePlayerObjectsQuery->bind_param("ss",
+                                           $args["room"],
+                                           $args["playerName"]);
+            $removePlayerObjectsQuery->execute();
+            $removePlayerObjectsQuery->close();
+        }
+        elseif ($args["action"] === "remove_player")
+        {
+            Player::Remove($args["playerId"]);
+        }
+        else
+        {
+            echo "unrecognized action: {$args["action"]}";
+            $error = true;
+        }
+
+        if (!isset($error))
+        {
+            $markAsUpdatedQuery = $connection->prepare(
+                "INSERT INTO LastRoomUpdate
+                (room) SELECT ?");
+            session_start();
+            $markAsUpdatedQuery->bind_param("s", $_SESSION["roomName"]);
+            session_write_close();
+            $markAsUpdatedQuery->execute();
+            $markAsUpdatedQuery->close();
+        }
+    }
+
+    $connection->close();
+}
 ?>

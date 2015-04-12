@@ -5,7 +5,6 @@ body {
     position: absolute;
     top: 0px;
     left: 0px;
-    border: 1px solid #d3d3d3;
     /*on bottom*/
     z-index: 0;
     -webkit-transform-style: preserve-3d;
@@ -64,18 +63,26 @@ g.cards_in_hand image {
     bottom: 70px;
     max-width: 200px;
 }
-#loadDeckHeader {
+#addDeckHeader {
     text-align: right;
 }
-#mouseoverBox {
+#deckButtonBox {
+    display: none;
+}
+.actionBox {
     position: absolute;
     /*off screen initially*/
     top: -1000px;
     left: -1000px;
-/*    width: 200px;
-    height: 20px;*/
-    /*on top of everything else*/
-    z-index: 3;
+}
+.actionBox div:hover {
+    background-color: lavender;
+}
+.actionBox div:active {
+    background-color: cornflowerblue;
+}
+.actionBox div.deleteItem:hover {
+    background-color: red;
 }
 .links {
     cursor: pointer;
@@ -85,6 +92,8 @@ g.cards_in_hand image {
     background-color: #ffffff;
     border: 1px solid #d3d3d3;
     border-radius: 3px;
+    /*on top of everything else*/
+    z-index: 1;
 }
 .inline {
     display: inline-block;

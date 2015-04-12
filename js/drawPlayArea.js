@@ -1,601 +1,312 @@
 /*global $ */
 var mainApp;
 
-function Zone(name) {
-    'use strict';
-    this.name = name;
-    this.cards = [];
-}
-
-function Player(name) {
-    'use strict';
-    this.name = name;
-    this.zones = {
-        deck: new Zone('deck'),
-        hand: new Zone('hand')
-    };
-    this.nextMarkerId = 0;
-    this.markers = [];
-    this.cardCount = 0;
-    // this.score = 0;
-    this.imageUrl = '';
-    this.imageScale = 1;
-
-    this.getZonesAsArray = function () {
-        var zoneArray = [];
-        for (var zone in this.zones) {
-            if (this.zones.hasOwnProperty(zone) &&
-                zone !== 'deck' &&
-                (zone !== 'hand' ||
-                 this.name === mainApp.playAreaSVG.tableData.playerName ||
-                 mainApp.playAreaSVG.tableData.playerName === '')) {
-                zoneArray.push(this.zones[zone]);
-            }
-        }
-        return zoneArray;
-    };
-}
-
 function TableData() {
     'use strict';
     var self = this;
-    this.deckCSV = null;
     this.room = null;
-    this.playerName = null;
-    this.player = null;
+    this.player = { id: null,
+                    name: null,
+                    backgroundImageUrl: null,
+                    zones: [] };
     this.players = {};
-    this.playerCount = 0;
-    this.lastUpdateId = -1;
+    this.decks = {};
     this.tableRadius = 750;
     this.markerHistory = [];
 
     this.setRoom = function (roomName) {
         this.room = roomName;
-        this.lastUpdateId = -1;
         $.post('tableState.php',
                 {
-                    action: 'change_room',
-                    room: this.room
+                    action: 'set_room',
+                    roomName: this.room
                 });
-        mainApp.updateFromServer();
     };
-    this.setPlayer = function (playerName) {
-        if (!this.players.hasOwnProperty(playerName)) {
-            this.players[playerName] = new Player(playerName);
+    this.setPlayer = function (playerId) {
+        // this might not find a newly added or renamed player, but
+        // setPlayer will get called again after the player update arrives
+        for (var i = 0; i < this.players.length; i++) {
+            if(this.players[i].id == playerId) {
+                this.player = this.players[i];
+                $('#deckBox').show();
+                $('#createMarkerBox').show();
+                break;
+            }
         }
+        $('#tableImageUrl').val(this.player.backgroundImageUrl);
+        $('#tableImageScale').val(this.player.backgroundImageScale);
 
-        this.playerName = playerName;
-        this.player = this.players[playerName];
-        d3.select('#tableImageUrl')
-            .property('value', this.player.imageUrl);
-        d3.select('#tableImageScale')
-            .property('value', this.player.imageScale.toString());
+        // rearrange player array to start with the selected player
+        for (var i = 0; i < this.players.length; i++) {
+            if (this.players[i].id === playerId) {
+                var frontPlayers = this.players.splice(0, i);
+                this.players = this.players.concat(frontPlayers);
+                break;
+            }
+        }
     };
     this.addPlayer = function (playerName) {
         if (playerName !== '') {
             $.post('tableState.php',
                     {
-                        action: 'addPlayer',
-                        room: this.room,
-                        player: playerName,
-                        // storing score in rotation
-                        rotation: '0',
-                        ordering: this.playerCount
-                    },
-                    function (data) {
-                        self.lastUpdateId = data.last_update_id;
-                    },
-                    'json');
-            this.playerCount += 1;
+                        action: 'add_player',
+                        playerName: playerName
+                    });
         }
     };
-    this.renamePlayer = function (playerName) {
-        // check if its a different name
-        if (playerName !== this.playerName &&
-            !this.players.hasOwnProperty(playerName)) {
-            // change name on server
-            $.post('tableState.php',
-                    {
-                        action: 'updatePlayerName',
-                        room: this.room,
-                        new_player: playerName,
-                        old_player: this.playerName,
-                    },
-                    function (data) {
-                        self.lastUpdateId = data.last_update_id;
-                    },
-                    'json');
-        }
-        this.setPlayer(playerName);
+    this.renamePlayer = function (playerId, newName) {
+        $.post('tableState.php',
+                {
+                    action: 'update_player_name',
+                    playerId: playerId,
+                    newName: newName,
+                });
     };
     this.setTableImageUrl = function (tableImageUrl) {
         if (tableImageUrl !== this.player.imageUrl) {
-            // change name on server
             $.post('tableState.php',
                     {
                         action: 'update_table_image_url',
-                        room: this.room,
-                        player: this.playerName,
-                        image_url: tableImageUrl,
-                    },
-                    function (data) {
-                        self.lastUpdateId = data.last_update_id;
-                    },
-                    'json');
+                        playerId: this.player.id,
+                        imageUrl: tableImageUrl,
+                    });
         }
     };
-    this.setTableImageScaleAndDistance = function (tableImageScale,
-                                                   tableImageDistance) {
-        // change name on server
+    this.setTableImageScaleAndDistance = function (imageScale, imageDistance) {
         $.post('tableState.php',
                 {
                     action: 'update_table_image_scale_and_distance',
-                    room: this.room,
-                    player: this.playerName,
-                    image_scale: tableImageScale,
-                    image_distance: tableImageDistance,
-                },
-                function (data) {
-                    self.lastUpdateId = data.last_update_id;
-                },
-                'json');
+                    playerId: this.player.id,
+                    imageScale: imageScale,
+                    imageDistance: imageDistance,
+                });
     };
     this.setDeckDealPoint = function (x, y) {
-        // change name on server
         $.post('tableState.php',
                 {
                     action: 'set_deck_deal_point',
-                    room: this.room,
-                    player: this.playerName,
+                    playerId: this.player.id,
                     x: x,
                     y: y,
-                },
-                function (data) {
-                    self.lastUpdateId = data.last_update_id;
-                },
-                'json');
+                });
     };
-    this.updatePlayerScore = function (name, score) {
+    this.updatePlayerScore = function (id, score) {
         $.post('tableState.php',
                 {
-                    action: 'updatePlayerScore',
-                    room: this.room,
-                    player: name,
-                    // storing score in rotation
-                    rotation: score
-                },
-                function (data) {
-                    self.lastUpdateId = data.last_update_id;
-                },
-                'json');
+                    action: 'update_player_score',
+                    playerId: id,
+                    score: score
+                });
     };
-    this.dbAddObjects = function (objectType, objects, zone) {
-        if (this.room !== null && this.player !== null) {
-            var objectIds = [],
-                names = [],
-                imageUrls = [],
-                xPositions = [],
-                yPositions = [];
-            for (var i = 0; i < objects.length; i++) {
-                objectIds.push(objects[i].id);
-                names.push(objects[i].name);
-                imageUrls.push(objects[i].image_url);
-                xPositions.push(objects[i].x);
-                yPositions.push(objects[i].y);
-            }
-            $.post('tableState.php',
-                    {
-                        action: 'add',
-                        room: this.room,
-                        player: this.playerName,
-                        zone: zone,
-                        type: objectType,
-                        'id[]': objectIds,
-                        'name[]': names,
-                        'image_url[]': imageUrls,
-                        'x_pos[]': xPositions,
-                        'y_pos[]': yPositions
-                    },
-                    function (data) {
-                        self.lastUpdateId = data.last_update_id;
-                    },
-                    'json');
-        }
+    this.updateCardGeometry = function (card) {
+        $.post('tableState.php',
+                {
+                    action: 'update_card_geometry',
+                    id: card.id,
+                    x: card.x,
+                    y: card.y,
+                    rotation: card.rotation,
+                    ordering: card.ordering
+                });
     };
-    this.dbUpdateObject = function (object) {
-        if (this.room !== null && this.player !== null) {
-            $.post('tableState.php',
-                    {
-                        action: 'update',
-                        room: this.room,
-                        player: object.playerName,
-                        zone: object.zone,
-                        type: object.type,
-                        id: object.id,
-                        x_pos: object.x,
-                        y_pos: object.y,
-                        rotation: object.rotation,
-                        ordering: object.ordering
-                    },
-                    function (data) {
-                        self.lastUpdateId = data.last_update_id;
-                    },
-                    'json');
-        }
+    this.updateMarkerGeometry = function (marker) {
+        $.post('tableState.php',
+                {
+                    action: 'update_marker_geometry',
+                    id: marker.id,
+                    x: marker.x,
+                    y: marker.y
+                });
     };
-    this.dbUpdateDeckOrdering = function () {
-        if (this.room !== null && this.player !== null) {
-            var deck = this.player.zones['deck'].cards,
-                objectIds = [],
-                orderings = [];
-            for (var i = 0; i < deck.length; i++) {
-                objectIds.push(deck[i].id);
-                orderings.push(deck[i].ordering);
-            }
-            $.post('tableState.php',
-                    {
-                        action: 'update_deck_order',
-                        room: this.room,
-                        player: this.playerName,
-                        'id[]': objectIds,
-                        'ordering[]': orderings
-                    },
-                    function (data) {
-                        self.lastUpdateId = data.last_update_id;
-                    },
-                    'json');
-        }
-    };
-    this.dbRemoveObject = function (object) {
-        if (this.room !== null && this.player !== null) {
-            $.post('tableState.php',
-                    {
-                        action: 'remove',
-                        room: this.room,
-                        player: object.playerName,
-                        type: object.type,
-                        id: object.id
-                    },
-                    function (data) {
-                        self.lastUpdateId = data.last_update_id;
-                    },
-                    'json');
-        }
-    };
-    this.dbRemovePlayerObjects = function (playerName) {
-        if (this.room !== null) {
-            delete this.players[playerName];
-            $.post('tableState.php',
-                    {
-                        action: 'remove_player_objects',
-                        room: this.room,
-                        player: playerName
-                    },
-                    function (data) {
-                        self.lastUpdateId = data.last_update_id;
-                    },
-                    'json');
-        }
-    };
-    this.dbRemovePlayer = function (playerName) {
-        if (this.room !== null) {
-            delete this.players[playerName];
-            $.post('tableState.php',
-                    {
-                        action: 'remove_player',
-                        room: this.room,
-                        player: playerName
-                    },
-                    function (data) {
-                        self.lastUpdateId = data.last_update_id;
-                    },
-                    'json');
-        }
+    this.removePlayer = function (playerId) {
+        $.post('tableState.php',
+                {
+                    action: 'remove_player',
+                    playerId: playerId
+                });
     };
 
     this.processRoomState = function (newData) {
-        // clear old data
-        this.players = {};
-        this.playerCount = 0;
-        this.lastUpdateId = newData.change_id;
-        for (var i = 0; i < newData.results.length; i++) {
-            var object = newData.results[i];
-            if (!this.players.hasOwnProperty(object.player)) {
-                this.players[object.player] = new Player(object.player);
-                this.playerCount += 1;
-            }
-            var player = this.players[object.player];
-            if (!player.zones.hasOwnProperty(object.zone)) {
-                player.zones[object.zone] = new Zone(object.zone);
-            }
+        // replace data
+        this.players = newData.results.players;
+        this.decks = newData.results.decks;
 
-            if (object.type === 'card') {
-                this.players[object.player].cardCount += 1;
-                var zone = player.zones[object.zone];
-                zone.cards.push({
-                    type: object.type,
-                    zone: object.zone,
-                    id: object.id,
-                    image_url: object.imageUrl,
-                    name: object.name,
-                    x: object.xPos,
-                    y: object.yPos,
-                    playerName: object.player,
-                    rotation: object.rotation,
-                    ordering: object.ordering
-                });
-            } else if (object.type === 'marker') {
-                player.markers.push({
-                    type: object.type,
-                    id: object.id,
-                    text: object.imageUrl,
-                    x: object.xPos,
-                    y: object.yPos,
-                    playerName: object.player
-                });
-                if (object.id >= player.nextMarkerId) {
-                    player.nextMarkerId = object.id + 1;
-                }
-            } else if (object.type === 'player') {
-                player.score = parseInt(object.rotation);
-                player.ordering = parseInt(object.ordering);
-                player.imageUrl = object.imageUrl
-                player.imageScale = object.name;
-                player.deckDealX = object.xPos;
-                player.deckDealY = object.yPos;
-                if (player.name === this.playerName) {
-                    d3.select('#tableImageUrl')
-                        .property('value', object.imageUrl);
-                }
-            } else if (object.type === 'room') {
-                this.tableRadius = object.name;
-                d3.select('#tableDistance')
-                    .property('value', this.tableRadius);
-            }
-        }
-        // sort cards (in each zone of each player)
-        for (var playerName in this.players) {
-            if (this.players.hasOwnProperty(playerName)) {
-                for (var zoneName in this.players[playerName].zones) {
-                    if (this.players[playerName].zones.hasOwnProperty(zoneName)) {
-                        this.players[playerName].zones[zoneName].cards.sort(
-                            function (a, b) {
-                                return  a.ordering - b.ordering;
-                            });
-                    }
-                }
-            }
-        }
-        this.setPlayer(this.playerName);
+        this.setPlayer(this.player.id);
     };
 
-    this.loadDeckFromCSV = function (deckCSV) {
-        this.deckCSV = deckCSV;
-        this.dbRemovePlayerObjects(this.playerName);
-        this.player.zones = {};
-        this.player.zones['deck'] = new Zone('deck');
-        this.player.zones['deck'].cards = $.csv.toObjects(deckCSV);
+    this.addDeckFromCSV = function (deckName, isShared, deckCSV) {
+        var cardsWithCounts = $.csv.toObjects(deckCSV);
 
-        var duplicateCards = [],
-            deck = this.player.zones['deck'].cards;
-        for (var i = 0; i < deck.length; i++) {
-            var card = deck[i];
-            // assign an id to each card
-            card.id = i;
-            card.zone = 'deck';
-            card.type = 'card';
-            card.rotation = 0;
-
-            // create extra copies of duplicate cards
-            for (var j = 1; j < card.count; j++) {
-                duplicateCards.push({
-                    name: card.name,
-                    image_url: card.image_url,
-                    count: card.count,
-                    id: deck.length + duplicateCards.length,
-                    zone: 'deck',
-                    type: 'card',
-                    rotation: 0
-                });
-            }
-        }
-        deck = deck.concat(duplicateCards);
-        this.player.zones['deck'].cards = deck;
-        this.dbAddObjects('card', deck, 'deck');
-        $('#deckCount').text(deck.length);
-    };
-    this.createMarker = function (text) {
-        var textFound = false;
-        for (var i = 0; i < this.markerHistory.length; i++) {
-            if(this.markerHistory[i].text === text) {
-                this.markerHistory[i].count += 1;
-                textFound = true;
-                break;
-            }
-        }
-        if (!textFound) {
-            this.markerHistory.push({
-                text: text,
-                count: 1
-            });
-        }
-        this.markerHistory.sort(function (a, b) {
-            return b.count - a.count;
-        })
-        var newMarker = {
-            id: this.player.nextMarkerId,
-            text: text,
-            // to cram it in the same table as cards
-            image_url: text,
-            x: this.player.deckDealX,
-            y: this.player.deckDealY,
-            player: this.playerName,
-            type: 'marker',
-            ordering: 0
+        var cardNames = [],
+            cardImageUrls = [],
+            ownerId = null;
+        if (!isShared) {
+            ownerId = this.player.id;
         };
-        this.player.markers.push(newMarker);
-        this.player.nextMarkerId += 1;
-        this.dbAddObjects('marker',
-                           [newMarker],
-                           'ontop');
-    };
-    this.resetPlayer = function () {
-        var deckCards = this.player.zones['deck'].cards;
-        for (var zoneName in this.player.zones) {
-            if (this.player.zones.hasOwnProperty(zoneName) &&
-                zoneName !== 'deck') {
-                var zoneCards = this.player.zones[zoneName].cards;
-
-                for (var i = 0; i < zoneCards.length; i++) {
-                    zoneCards[i].zone = 'deck';
-                    zoneCards[i].x = this.player.deckDealX;
-                    zoneCards[i].y = this.player.deckDealY;
-                    zoneCards[i].rotation = 0;
-                    zoneCards[i].ordering = 0;
-                    deckCards.push(zoneCards[i]);
-                }
-
-                this.player.zones[zoneName].cards = [];
+        for (var i = 0; i < cardsWithCounts.length; i++) {
+            var card = cardsWithCounts[i];
+            for (var j = 0; j < card.count; j++) {
+                cardNames.push(card.name);
+                cardImageUrls.push(card.image_url);
             }
         }
-        this.player.markers = [];
+
         $.post('tableState.php',
                 {
-                    action: 'reset_player',
-                    room: this.room,
-                    player: this.player.name,
-                    x: this.player.deckDealX,
-                    y: this.player.deckDealY
-                },
-                function (data) {
-                    self.lastUpdateId = data.last_update_id;
-                },
-                'json');
-        this.shuffleDeck();
+                    action: 'add_deck',
+                    deckName: deckName,
+                    ownerId: ownerId,
+                    'cardNames[]': cardNames,
+                    'cardImageUrls[]': cardImageUrls
+                });
     };
-    this.shuffleDeck = function () {
-        var deck = this.player.zones['deck'].cards;
-        for (var i = deck.length - 1; i > 0; i--) {
-            var j = Math.floor(Math.random() * (i + 1));
-            var temp = deck[i];
-            deck[i] = deck[j];
-            deck[j] = temp;
-        }
-        for (var i = deck.length - 1; i > 0; i--) {
-            deck[i].ordering = i;
-        }
-        this.dbUpdateDeckOrdering();
-    };
-    this.drawCard = function () {
-        var deck = this.player.zones['deck'].cards;
-        if (deck.length > 0) {
-            deck[deck.length - 1].x = this.player.deckDealX;
-            deck[deck.length - 1].y = this.player.deckDealY;
-            this.changeCardZone(deck[deck.length - 1],
-                                'hand');
-        }
-    };
-    this.drawCardById = function (id) {
-        var deck = this.player.zones['deck'].cards,
-            card = null;
-        for (var i = 0; i < deck.length; i++) {
-            if (deck[i].id == id) {
-                this.changeCardZone(deck[i],
-                                    'hand');
-                break;
-            }
-        }
-    };
-    this.changeCardZone = function (card, targetZone, end) {
-        if (this.player.zones[card.zone].cards.length > 0) {
-            // remove from old zone
-            var sourceCards = this.player.zones[card.zone].cards;
-            for (var i = 0; i < sourceCards.length; i++) {
-                if (sourceCards[i].id == card.id) {
-                    sourceCards.splice(i, 1);
+    this.createMarker = function (text) {
+        if (this.player.id !== null) {
+            var textFound = false;
+            for (var i = 0; i < this.markerHistory.length; i++) {
+                if(this.markerHistory[i].text === text) {
+                    this.markerHistory[i].count += 1;
+                    textFound = true;
                     break;
                 }
             }
 
-            // add to new zone
-            if (!this.player.zones.hasOwnProperty(targetZone)) {
-                this.player.zones[targetZone] = new Zone(targetZone);
-            }
-            var targetCards = this.player.zones[targetZone].cards,
-                newOrdering = 0;
-            if (targetZone === 'deck' &&
-                end === 'bottom') {
-                for (i = 0; i < targetCards.length; i++) {
-                    if (targetCards[i].ordering <= newOrdering) {
-                        newOrdering = targetCards[i].ordering - 1;
-                    }
-                }
-            } else {
-                for (i = 0; i < targetCards.length; i++) {
-                    if (targetCards[i].ordering >= newOrdering) {
-                        newOrdering = targetCards[i].ordering + 1;
-                    }
-                }
+            if (!textFound) {
+                this.markerHistory.push({
+                    text: text,
+                    count: 1
+                });
             }
 
-            targetCards.push(card);
-            // update server
-            card.zone = targetZone;
-            card.ordering = newOrdering;
-            this.dbUpdateObject(card);
+            $.post('tableState.php',
+                    {
+                        action: 'add_marker',
+                        playerId: this.player.id,
+                        text: text,
+                        x: this.player.deckDealXPos,
+                        y: this.player.deckDealYPos,
+                        color: null
+                    });
         }
+    };
+    this.resetPlayer = function () {
+        $.post('tableState.php',
+                {
+                    action: 'reset_player',
+                    playerId: this.player.id,
+                });
+        this.shuffleDeck();
+    };
+    this.shuffleDeck = function (deckId) {
+        $.post('tableState.php',
+                {
+                    action: 'shuffle_deck',
+                    deckId: deckId
+                });
+    };
+    this.returnCardsToDeck = function (deckId) {
+        $.post('tableState.php',
+                {
+                    action: 'return_cards_to_deck',
+                    deckId: deckId
+                });
+    };
+    this.removeDeck = function (deckId) {
+        $.post('tableState.php',
+                {
+                    action: 'remove_deck',
+                    deckId: deckId
+                });
+    };
+    this.setDeckSharedStatus = function (deckId, isShared) {
+        var ownerId = null;
+        if (!isShared) {
+            ownerId = this.player.id;
+        }
+        $.post('tableState.php',
+                {
+                    action: 'update_deck_owner',
+                    deckId: deckId,
+                    ownerId: ownerId
+                });
+    };
+    this.drawCard = function (deckId) {
+        $.post('tableState.php',
+                {
+                    action: 'draw_card',
+                    deckId: deckId,
+                    playerId: this.player.id
+                });
+    };
+    this.drawCardById = function (cardId) {
+        this.updateCardZone(cardId, 'hand');
+    };
+    this.updateCardZone = function (cardId, targetZone, topOrBottom) {
+        if (typeof(topOrBottom) === 'undefined') {
+            topOrBottom = 'top';
+        }
+        var playerId = null;
+        if (targetZone !== 'deck') {
+            playerId = this.player.id;
+        }
+        $.post('tableState.php',
+                {
+                    action: 'update_card_zone',
+                    cardId: cardId,
+                    playerId: playerId,
+                    zone: targetZone,
+                    topOrBottom: topOrBottom
+                });
+    };
+    this.updateCardRotation = function (cardId, rotation) {
+        $.post('tableState.php',
+                {
+                    action: 'update_card_rotation',
+                    id: cardId,
+                    rotation: rotation
+                });
     };
     this.rotateLeft = function (card) {
         card.rotation = (card.rotation - 90) % 360;
-        this.dbUpdateObject(card);
+        this.updateCardRotation(card.id, card.rotation);
     };
     this.rotateRight = function (card) {
         card.rotation = (card.rotation + 90) % 360;
-        this.dbUpdateObject(card);
+        this.updateCardRotation(card.id, card.rotation);
     };
     this.unrotatePlayerCards = function () {
-        if (this.room !== null && this.player !== null) {
-            $.post('tableState.php',
-                    {
-                        action: 'unrotate_player_cards',
-                        room: this.room,
-                        player: this.playerName
-                    },
-                    function (data) {
-                        self.lastUpdateId = data.last_update_id;
-                    },
-                    'json');
-        }
+        $.post('tableState.php',
+                {
+                    action: 'unrotate_player_cards',
+                    playerId: this.player.id
+                });
     };
-    this.getPlayerArray = function () {
-        var playerArray = [],
+    // get the decks owned by this.player and shared decks
+    this.getDeckArray = function () {
+        var deckArray = [],
             i = 0;
-        for (var playerName in this.players) {
-            if (this.players.hasOwnProperty(playerName)) {
-                if (this.players[playerName].name !== '') {
-                // if (this.players[playerName].cardCount > 0 ||
-                //     this.players[playerName].markers.length > 0) {
-                    playerArray.push(this.players[playerName]);
-                }
+        for (var i = 0; i < this.decks.length; i++) {
+            var deck = this.decks[i];
+            // playerId is null for shared decks
+            if (deck.playerId == this.player.id ||
+                deck.playerId == null) {
+                deckArray.push(deck);
             }
         }
-        playerArray.sort(function (a, b) {
-            return a.ordering - b.ordering;
-        });
-        for (i = 0; i < playerArray.length; i++) {
-            if (playerArray[i].name === this.playerName ||
-                this.playerName === '') {
-                var frontPlayers = playerArray.splice(0, i);
-                playerArray = playerArray.concat(frontPlayers);
+        return deckArray;
+    };
+    this.playerExists = function (playerName) {
+        var playerExists = false;
+        for (var i = 0; i < this.players.length; i++) {
+            if (this.players[i].name === playerName) {
+                playerExists = true;
                 break;
             }
         }
-        for (i = 0; i < playerArray.length; i++) {
-            playerArray[i].order = i;
-        }
-        return playerArray;
+        return playerExists;
     };
 }
+
 
 function PlayAreaSVG() {
     'use strict';
@@ -620,10 +331,11 @@ function PlayAreaSVG() {
     this.sleeping = true;
     this.dragInProgress = false;
     this.playerRotations = {};
-    // point that all players are rotated around.
-    // y varies based on number of players
-    this.playerRotationPoint = {x: 0,
-                                y: 0};
+
+    this.deckActionTargetId = null;
+    this.playerActionTargetId = null;
+    this.deckActionTargetRow = null;
+    this.playerActionTargetRow = null;
 
     this.init = function () {
         var canvasOffset;
@@ -635,7 +347,6 @@ function PlayAreaSVG() {
         this.y = canvasOffset.top;
         this.tableData = new TableData();
         this.tableData.setRoom($('#roomName').val());
-        this.tableData.setPlayer($('#playerName').val());
     };
 
     this.drag = d3.behavior.drag();
@@ -648,7 +359,7 @@ function PlayAreaSVG() {
             parent = d3.select($(this).parent()[0]);
         if (drugObject.classed('enlarged')) {
             d.clicked = true;
-            drugObject = d3.select('[player="' + d.playerName + '"]' +
+            drugObject = d3.select('[player="' + d.playerId + '"]' +
                                    '[card_id="' + d.id + '"]')
             parent = d3.select($(drugObject[0][0]).parent()[0]);
         } else {
@@ -702,14 +413,14 @@ function PlayAreaSVG() {
                 .attr('transform', function (d) {
                     var imgCenterX = d.x + d.width / 2,
                         imgCenterY = d.y + d.height / 2,
-                        rotation = -1 * self.playerRotations[d.playerName].degrees;
+                        rotation = -1 * self.playerRotations[d.playerId].degrees;
                     return 'rotate(' + rotation + ' ' +
                                        imgCenterX + ' ' +
                                        imgCenterY + ')';
                 });
 
             // move source card beneath enlarged
-            drugObject = d3.select('[player="' + d.playerName + '"]' +
+            drugObject = d3.select('[player="' + d.playerId + '"]' +
                                    '[card_id="' + d.id + '"]')
         }
 
@@ -741,110 +452,114 @@ function PlayAreaSVG() {
             d.originCard
         }
         if (!d.clicked) {
-            self.tableData.dbUpdateObject(d);
+            if (drugObject.classed('marker')) {
+                self.tableData.updateMarkerGeometry(d);
+            } else {
+                self.tableData.updateCardGeometry(d);
+            }
         }
         mainApp.updateFromServer();
     });
-    this.drawCard = function () {
-        this.tableData.drawCard();
-        this.drawCards();
-    };
-    this.drawSelectedCard = function () {
-        var selectedCardId = d3.select('#deckList').property('value');
-        this.tableData.drawCardById(selectedCardId);
-        this.drawCards();
-    };
     this.drawTable = function () {
-        var playerArray = this.tableData.getPlayerArray();
+        var playerArray = this.tableData.players;
         var players = d3.select('#tableGraphic').selectAll('g')
             .data(playerArray,
                   function (d) { return d.name; });
         players.enter().append('g').append('image');
         players
             .attr('transform', function (d, i) {
-                d.rotation = 360 / playerArray.length * i;
-                d.yOffset = -1 * self.tableData.tableRadius * (playerArray.length);
+                var rotation = 360 / playerArray.length * i,
+                    yOffset = -1 * self.tableData.tableRadius * (playerArray.length);
 
-                return 'rotate(' + d.rotation + ' 0 ' + d.yOffset + ')';
+                return 'rotate(' + rotation + ' 0 ' + yOffset + ')';
             });
         players.select('image')
             .attr('xlink:href', function (d) {
                 // this will be a broken link for unset players
-                return d.imageUrl;
+                return d.backgroundImageUrl;
             })
             .style('display', function (d) {
                 // this is a crude filter for unset values (which will be '0')
-                if (d.imageUrl.length > 5) {
+                if (d.backgroundImageUrl != null) {
                     return ""
                 } else {
                     return "none"
                 }
             })
             .attr('x', function (d) {
-                return -2250 * self.tableData.players[d.name].imageScale;
+                return -2250 * d.backgroundImageScale;
             })
             .attr('y', function (d) {
-                return -1200 * self.tableData.players[d.name].imageScale;
+                return -1200 * d.backgroundImageScale;
             })
             .attr('width', function (d) {
-                return 4500 * self.tableData.players[d.name].imageScale;
+                return 4500 * d.backgroundImageScale;
             })
             .attr('height', function (d) {
-                return 2400 * self.tableData.players[d.name].imageScale;
+                return 2400 * d.backgroundImageScale;
             });
         players.exit().remove();
     };
     this.drawCards = function () {
-        var currentPlayer = this.tableData.player;
-        if (currentPlayer.zones.hasOwnProperty('deck')) {
-            $('#deckCount').text(currentPlayer.zones['deck'].cards.length);
-        }
-        this.drawDeckList();
-
-        var playerArray = this.tableData.getPlayerArray();
-        this.playerRotationPoint = {x: 0,
-                                    y: -1 * self.tableData.tableRadius *
-                                    (playerArray.length)};
+        var playerArray = this.tableData.players;
         var players = d3.select('#players').selectAll('g')
             .data(playerArray,
                   function (d) { return d.name; });
         players.enter().append('g');
         players
-            .attr('transform', function (d) {
-                var rotation = 360 / playerArray.length * d.order;
-                self.playerRotations[d.name] = {
+            .attr('transform', function (d, i) {
+                var rotation = 360 / playerArray.length * i,
+                    yOffset = -1 * self.tableData.tableRadius * (playerArray.length);
+                self.playerRotations[d.id] = {
                     degrees: rotation,
                     radians: rotation  * (Math.PI / 180)};
 
-                return 'rotate(' + rotation + ' ' +
-                               self.playerRotationPoint.x + ' ' +
-                               self.playerRotationPoint.y + ')';
+                return 'rotate(' + rotation + ' 0 ' + yOffset + ')';
             });
         players.exit().remove();
 
         var zones = players.selectAll('g')
-            .data(function (d) { return d.getZonesAsArray(); },
-                  function (d) { return d.name; });
+            .data(function (d) {
+                    var zones = [];
+                    if (d.id == self.tableData.player.id) {
+                        zones = d.zones;
+                    } else {
+                        // don't draw other player's hands
+                        for (var zone in d.zones) {
+                            if (zone != 'hand') {
+                                    zones.push({
+                                        name: d.zones[zone].name,
+                                        cards: d.zones[zone].cards});
+                            }
+                        }
+                    }
+                    return zones;
+                },
+                function (d) { return d.name; });
         zones.enter().append('g')
             .classed('cards_in_hand',
                     function (d) { return d.name === 'hand'; });
         zones.exit().remove();
 
         var cards = zones.selectAll('image')
-            .data(function (d) { return d.cards; },
-                  function (d) { return d.id; });
+            .data(function (d) {
+                    return d.cards;
+                },
+                function (d) {
+                    return d.id;
+                });
 
         cards.enter().append('image')
             .attr('player', function (d) {
-                return d.playerName;
+                return d.playerId;
             })
             .attr('card_id', function (d) {
                 return d.id;
             })
             .attr('xlink:href', function (d) {
                 if (d.zone !== 'inPlayFaceDown' ||
-                    d.playerName === self.tableData.playerName) {
-                    return d.image_url;
+                    d.playerId === self.tableData.player.id) {
+                    return d.imageUrl;
                 } else {
                     return 'cardback.png';
                 }
@@ -889,17 +604,17 @@ function PlayAreaSVG() {
         cards.on('click.buttons', self.drawCardButtons);
     };
     this.drawMarkers = function () {
-        var playerArray = this.tableData.getPlayerArray();
+        var playerArray = this.tableData.players;
         var players = d3.select('#markers').selectAll('g')
             .data(playerArray,
                   function (d) { return d.name; });
         players.enter().append('g');
         players
             .attr('transform', function (d, i) {
-                d.rotation = 360 / playerArray.length * i;
-                d.yOffset = -1 * self.tableData.tableRadius * (playerArray.length);
+                var rotation = 360 / playerArray.length * i,
+                    yOffset = -1 * self.tableData.tableRadius * (playerArray.length);
 
-                return 'rotate(' + d.rotation + ' 0 ' + d.yOffset + ')';
+                return 'rotate(' + rotation + ' 0 ' + yOffset + ')';
             });
         players.exit().remove();
 
@@ -960,20 +675,20 @@ function PlayAreaSVG() {
                     return player.attr('transform');
                 });
             var newCardData = enlargedCardZone.selectAll('image')
-                    .data([d], function (d) {return d.image_url; });
+                    .data([d], function (d) {return d.imageUrl; });
             mainApp.enlargedCard = newCardData.enter().append('image');
             mainApp.enlargedCard
                 .classed('enlarged', true)
                 .attr('transform', function (d) {
                     var imgCenterX = d.x + d.width / 2,
                         imgCenterY = d.y + d.height / 2,
-                        rotation = -1 * self.playerRotations[d.playerName].degrees;
+                        rotation = -1 * self.playerRotations[d.playerId].degrees;
                     return 'rotate(' + rotation + ' ' +
                                        imgCenterX + ' ' +
                                        imgCenterY + ')';
                 })
                 .attr('xlink:href', function (d) {
-                    return d.image_url;
+                    return d.imageUrl;
                 })
                 .attr('x', function (d) {
                     d.enlargedX = d.x + (d.width * enlargedScale - d.width) / (2 * enlargedScale);
@@ -1006,7 +721,7 @@ function PlayAreaSVG() {
     this.drawCardButtons = function (d) {
         // d3.event.stopPropagation(); // silence other listeners
         d3.select('#cardButtons').selectAll("*").remove();
-        if(self.tableData.playerName === d.playerName)
+        if(self.tableData.player.id === d.playerId)
         {
             // show buttons for own cards
             var card = d;
@@ -1106,32 +821,25 @@ function PlayAreaSVG() {
                 .on('click', function (d) {
                     if (d.text === 'L') {
                         self.tableData.rotateLeft(card);
-                        self.drawCards();
                     } else if (d.text === 'R') {
                         self.tableData.rotateRight(card);
-                        self.drawCards();
                     } else if (d.text === 'T') {
-                        self.tableData.changeCardZone(card,
+                        self.tableData.updateCardZone(card.id,
                                                       'deck',
                                                       'top');
-                        self.drawCards();
                     } else if (d.text === 'B') {
-                        self.tableData.changeCardZone(card,
+                        self.tableData.updateCardZone(card.id,
                                                       'deck',
                                                       'bottom');
-                        self.drawCards();
                     } else if (d.text === 'Play') {
-                        self.tableData.changeCardZone(card,
+                        self.tableData.updateCardZone(card.id,
                                                       'inPlay');
-                        self.drawCards();
                     } else if (d.text === 'Play Face Down') {
-                        self.tableData.changeCardZone(card,
+                        self.tableData.updateCardZone(card.id,
                                                       'inPlayFaceDown');
-                        self.drawCards();
                     } else if (d.text === 'Hand') {
-                        self.tableData.changeCardZone(card,
+                        self.tableData.updateCardZone(card.id,
                                                       'hand');
-                        self.drawCards();
                     } else if (d.text === 'Unrotate All') {
                         self.tableData.unrotatePlayerCards();
                     }
@@ -1170,133 +878,183 @@ function PlayAreaSVG() {
         }
     }
     this.drawScoreBoard = function () {
-        var playerArray = this.tableData.getPlayerArray();
+        var playerArray = this.tableData.players;
 
         var players = d3.select('#scoreBoard tbody').selectAll('tr')
             .data(playerArray,
                   function (d) {
-                    return d.name;
+                    return d.id;
                 });
         var newPlayers = players.enter().append('tr')
             .classed('player', true);
 
         newPlayers.each(function (d) {
             var playerRow = d3.select(this);
-            playerRow.append('td').append('button')
-                .classed('playerOptionToggle', true)
-                .html('▼')
-                .on('click', function (d) {
-                    $('#playerName').val(d.name);
-                    $('#playerName').trigger('input');
+            playerRow.append('td')
+                .classed('name', true)
+                .html(function (d) {
+                    return d.name;
                 });
-            playerRow.append('td').html(function (d) { return d.name; });
             playerRow.append('td').append('span')
-                .classed('handCount', true)
-                .html(function () {
-                    return d.zones['hand'].cards.length;
-                });
+                .classed('cardCount', true);
             playerRow.append('td').append('button')
                 .classed('decrementScore', true)
                 .html('-')
-                .on('click', function () {
+                .on('click', function (d) {
                     d.score -= 1;
-                    self.tableData.updatePlayerScore(d.name, d.score);
+                    self.tableData.updatePlayerScore(d.id, d.score);
                 });
             playerRow.append('td').append('input')
                 .classed('score', true)
                 .attr('size', 1)
-                .on('input', function () {
+                .on('input', function (d) {
                     d.score = parseInt(this.value);
-                    self.tableData.updatePlayerScore(d.name, d.score);
+                    self.tableData.updatePlayerScore(d.id, d.score);
                 });
             playerRow.append('td').append('button')
                 .classed('incrementScore', true)
                 .html('+')
-                .on('click', function () {
+                .on('click', function (d) {
                     d.score += 1;
-                    self.tableData.updatePlayerScore(d.name, d.score);
+                    self.tableData.updatePlayerScore(d.id, d.score);
+                });
+            playerRow.append('td').append('button')
+                .html('▼')
+                .on('click', function (d) {
+                    d3.event.stopPropagation();
+                    // can't just assign 'd' because it is statically fixed
+                    // by the each() so the cards won't update
+                    self.playerActionTargetId = d.id;
+                    self.playerActionTargetRow = playerRow;
+                    // move box on-screen
+                    self.hideActionBoxes();
+                    d3.select('#playerActionBox')
+                        .style('left', d3.event.pageX + 'px')
+                        .style('top', d3.event.pageY + 'px');
+                    // $('#playerName').val(d.name);
+                    // $('#playerName').trigger('input');
                 });
         });
 
         players.each(function (d) {
             var row = d3.select(this);
             row.select('.score')
-                .property('value', d.score);
+                .attr('value', d.score);
 
-            row.select('.handCount')
-                .html(d.zones['hand'].cards.length);
-            });
-
-        players.exit().remove();
-    };
-    this.drawPlayerSelect = function () {
-        var playerArray = this.tableData.getPlayerArray();
-        playerArray.unshift({name: ''});
-
-        var players = d3.select('#playerSelect').selectAll('option')
-            .data(playerArray,
-                  function (d) {
-                    return d.name;
+            row.select('.cardCount')
+                .html(function (d) {
+                    var cardCount = 0;
+                    for (var i = 0; i < d.zones.length; i++) {
+                        if(d.zones[i].name === 'hand') {
+                            cardCount = d.zones[i].cards.length;
+                            break;
+                        }
+                    }
+                    return cardCount;
                 });
-        var newPlayers = players.enter().append('option')
-            .html(function (d) {
-                    return d.name;
-                })
-            .property('value',
-                  function (d) {
-                    return d.name;
-                });
-
+        });
         players.exit().remove();
     };
     this.drawDeckList = function () {
-        var deck = this.tableData.player.zones['deck'].cards,
-            sortedDeck = [];
+        var deckArray = this.tableData.getDeckArray();
 
-        for (var i = 0; i < deck.length; i++) {
-            sortedDeck.push({
-                    type: deck[i].type,
-                    zone: deck[i].zone,
-                    id: deck[i].id,
-                    image_url: deck[i].image_url,
-                    name: deck[i].name,
-                    x: deck[i].x,
-                    y: deck[i].y,
-                    playerName: deck[i].playerName,
-                    rotation: deck[i].rotation,
-                    ordering: deck[i].ordering
+        var decks = d3.select('#deckTable tbody').selectAll('tr')
+            .data(deckArray, function (d) {
+                return d.id;
+            });
+        var newDecks = decks.enter().append('tr');
+
+        newDecks.each(function (d) {
+            var deckRow = d3.select(this);
+            deckRow.append('td')
+                .classed('name', true)
+                .html(function (d) {
+                    return d.name;
                 });
-        }
-        sortedDeck.sort(function (a, b) {
-            // if (a.id < b.id) {
-            if (a.name < b.name) {
-                return -1;
-            // } else if (a.id > b.id) {
-            } else if (a.name > b.name) {
-                return 1;
-            } else {
-                return 0;
-            }
+            deckRow.append('td').append('span')
+                .classed('cardCount', true);
+            deckRow.append('td').append('button')
+                .classed('drawCardFromDeck', true)
+                .html('Draw')
+                .on('click', function () {
+                    d3.select('#enlargedCard').selectAll("*").remove();
+                    self.tableData.drawCard(d.id);
+                });
+            deckRow.append('td').append('button')
+                .html('▼')
+                .on('click', function (d) {
+                    d3.event.stopPropagation();
+                    // can't just assign 'd' because it is statically fixed
+                    // by the each() so the cards won't update
+                    self.deckActionTargetId = d.id;
+                    self.deckActionTargetRow = deckRow;
+                    if (d.playerId === null) {
+                        d3.select('#deckIsShared input')
+                            .property('checked', 'checked')
+                    } else {
+                        d3.select('#deckIsShared input')
+                            .property('checked', '')
+                    }
+                    // move box on-screen
+                    self.hideActionBoxes();
+                    d3.select('#deckActionBox')
+                        .style('left', d3.event.pageX + 'px')
+                        .style('top', d3.event.pageY + 'px');
+                });
         });
 
-        var cards = d3.select('#deckList').selectAll('option')
-            .data(sortedDeck, function (d) {
-                   return d.playerName + d.id;
-               });
-        cards.enter().append('option')
-            .attr('value', function (d) {
-                return d.id;
-            })
-            .html(function (d) {
-                // return d.id;
-                return d.name;
-            });
+        decks.each(function (d) {
+            var row = d3.select(this);
 
-        cards.exit().remove();
+            row.select('.cardCount')
+                .html(function (d) {
+                    return d.cards.length;
+                });
+        });
+        decks.exit().remove();
+    };
+    this.drawCardList = function () {
+        if (this.deckActionTargetId !== null) {
+            var sortedDeck = [];
+            for (var i = 0; i < self.tableData.decks.length; i++) {
+                if(self.tableData.decks[i].id === this.deckActionTargetId) {
+                    cards = self.tableData.decks[i].cards;
+                    break;
+                }
+            }
+
+            var cards = d3.select('#deckList').selectAll('option')
+                .data(cards, function (d) {
+                       return d.id;
+                   });
+            cards.enter().append('option')
+                .attr('value', function (d) {
+                    return d.id;
+                })
+                .html(function (d) {
+                    // return d.id;
+                    return d.name;
+                });
+
+            cards.exit().remove();
+
+            cards.sort(function (a, b) {
+                // if (a.id < b.id) {
+                if (a.name < b.name) {
+                    return -1;
+                // } else if (a.id > b.id) {
+                } else if (a.name > b.name) {
+                    return 1;
+                } else {
+                    return 0;
+                }
+            });
+        }
     };
     this.drawMarkerHistory = function () {
         // populate marker history with current player's markers
-        if (this.tableData.markerHistory.length === 0) {
+        if (this.tableData.markerHistory.length === 0 &&
+            this.tableData.player.id !== null) {
             for (var i = 0; i < this.tableData.player.markers.length; i++) {
                 var marker = this.tableData.player.markers[i],
                     textFound = false;
@@ -1314,9 +1072,6 @@ function PlayAreaSVG() {
                     });
                 }
             }
-            this.tableData.markerHistory.sort(function (a, b) {
-                return b.count - a.count;
-            });
         }
         var history = d3.select('#markerHistory').selectAll('tr')
             .data(this.tableData.markerHistory, function (d) {
@@ -1336,7 +1091,16 @@ function PlayAreaSVG() {
         });
 
         history.exit().remove();
-        history.order();
+        history.sort(function (a, b) {
+                return b.count - a.count;
+        });
+    };
+    this.hideActionBoxes = function () {
+        d3.selectAll('.actionBox').each(function () {
+            d3.select(this)
+                .style('left', '-1000px')
+                .style('top', '-1000px');
+        })
     };
     this.resizeSVG = function () {
         // http://stackoverflow.com/a/16265661/225730
@@ -1447,19 +1211,22 @@ function MainApp() {
         this.playAreaSVG.init();
         this.coordDisplay = $('#coordDisplay');
         this.enlargedCard = $('#enlargedCard');
-        this.updateFromServer();
+        this.updateFromServer(true);
     };
 
-    this.updateFromServer = function () {
+    this.updateFromServer = function (initial) {
         if (this.playAreaSVG.tableData.room !== null
             & this.sleeping) {
             this.sleeping = false;
+            var args = {
+                action: 'get_state',
+                roomName: this.playAreaSVG.tableData.room
+            }
+            if (initial) {
+                args.lastUpdateId = -1;
+            }
             $.post('tableState.php',
-                    {
-                        action: 'get_state',
-                        room: this.playAreaSVG.tableData.room,
-                        last_update_id: this.playAreaSVG.tableData.lastUpdateId
-                    },
+                    args,
                     function (data) {
                         // don't update while something is being drug
                         if (self.playAreaSVG.dragInProgress) {
@@ -1469,11 +1236,7 @@ function MainApp() {
                                 !self.playAreaSVG.dragInProgress) {
                                 self.noChangesCount = 0;
                                 self.playAreaSVG.tableData.processRoomState(data);
-                                self.playAreaSVG.drawTable();
-                                self.playAreaSVG.drawCards();
-                                self.playAreaSVG.drawMarkers();
-                                self.playAreaSVG.drawScoreBoard();
-                                self.playAreaSVG.drawPlayerSelect();
+                                self.redraw();
                             } else {
                                 self.noChangesCount += 1;
                             }
@@ -1493,11 +1256,19 @@ function MainApp() {
             });
         }
     };
+    this.redraw = function () {
+        self.playAreaSVG.drawTable();
+        self.playAreaSVG.drawCards();
+        self.playAreaSVG.drawMarkers();
+        self.playAreaSVG.drawScoreBoard();
+        self.playAreaSVG.drawDeckList();
+        self.playAreaSVG.drawCardList();
+        self.playAreaSVG.drawMarkerHistory();
+    }
     this.setCoordDisplay = function (x, y) {
         this.coordDisplay.html('x: ' + x + ' y: ' + y);
     };
     this.startMouse = function (pageX, pageY) {
-        var mousePos;
         // check this in case the cursor was released outside the document
         // in which case the event would have been missed
         if (this.mouseIsDown) {
@@ -1542,10 +1313,10 @@ $(document).ready(function initialSetup() {
         'mousewheel': function canvasMouseScrolled(event) {
             if (event.deltaY > 0) {
                 mainApp.playAreaSVG.zoomIn(event.pageX,
-                                         event.pageY);
+                                           event.pageY);
             } else {
                 mainApp.playAreaSVG.zoomOut(event.pageX,
-                                          event.pageY);
+                                            event.pageY);
             }
         },
         'click': function hideButtons(event) {
@@ -1575,19 +1346,46 @@ $(document).ready(function initialSetup() {
                                   mainApp.playAreaSVG.svgHeight / 2);
     });
 
+    $('#deckBox').hide();
+    $('#createMarkerBox').hide();
     $('#deckListBox').hide();
     $('#showDeckList').on('click', function showLoadDeckForm() {
         $('#deckListBox').toggle();
     });
-    $('#loadDeckForm').hide();
-    $('#loadDeckHeader').on('click', function showLoadDeckForm() {
-        $('#loadDeckForm').toggle();
-        if ($.trim($(this).text()) == 'Load') {
-            $(this).text('Hide');
+    $('#addPlayerBox').hide();
+    $('#addPlayerHeader').on('click', function showLoadDeckForm() {
+        $('#addPlayerBox').toggle();
+        if ($.trim($(this).text()) == 'Add Player') {
+            $(this).text('Hide Form');
         } else {
-            $(this).text('Load');
+            $(this).text('Add Player');
         }
     });
+    $('#addPlayer').on('click', function passCSVToTableData() {
+        var playerName = $('#playerName').val();
+        mainApp.playAreaSVG.tableData.addPlayer(playerName);
+        $('#addPlayerBox').hide();
+    });
+
+    $('#addDeckBox').hide();
+    $('#addDeckHeader').on('click', function showLoadDeckForm() {
+        $('#addDeckBox').toggle();
+        if ($.trim($(this).text()) == 'Add Deck') {
+            $(this).text('Hide Form');
+        } else {
+            $(this).text('Add Deck');
+        }
+    });
+    $('#addDeck').on('click', function passCSVToTableData() {
+        var deckName = $('#deckName').val(),
+            isShared = $('#newDeckIsShared').prop('checked'),
+            deckCSV = $('#deckCSV').val();
+        mainApp.playAreaSVG.tableData.addDeckFromCSV(deckName,
+                                                     isShared,
+                                                     deckCSV);
+        $('#addDeckBox').hide();
+    });
+
     $('#settingsBox').hide();
     $('#settingsHeader').on('click', function showLoadDeckForm() {
         $('#settingsBox').toggle();
@@ -1596,114 +1394,26 @@ $(document).ready(function initialSetup() {
     $('#markerHistoryHeader').on('click', function showLoadDeckForm() {
         $('#markerHistory').toggle();
     });
-    $('#loadDeck').on('click', function passCSVToTableData() {
-        var deckCSV = $('#deckCSV').val();
-        mainApp.playAreaSVG.tableData.loadDeckFromCSV(deckCSV);
-        $('#loadDeckForm').hide();
-    });
-    $('#setRemoveBox').hide();
-    $('#shuffleDeck').on('click', function shuffleDeck() {
-        mainApp.playAreaSVG.tableData.shuffleDeck();
-    });
-    $('#drawCard').on('click', function drawCard() {
-        d3.select('#enlargedCard').selectAll("*").remove();
-        mainApp.playAreaSVG.drawCard();
-    });
+
     $('#drawSelectedCard').on('click', function drawCard() {
-        mainApp.playAreaSVG.drawSelectedCard();
+        var selectedCardId = d3.select('#deckList').property('value');
+        mainApp.playAreaSVG.tableData.drawCardById(selectedCardId);
     });
+
     $('#setRoom').on('click', function setRoom() {
         mainApp.playAreaSVG.tableData.setRoom($('#roomName').val());
     });
-    $('#setPlayer').on('click', function setPlayer() {
-        var selectedPlayer = d3.select('#playerSelect').property('value');
-        $('#playerName').val(selectedPlayer);
-        mainApp.playAreaSVG.tableData.setPlayer(selectedPlayer);
-        mainApp.playAreaSVG.drawTable();
-        mainApp.playAreaSVG.drawCards();
-        mainApp.playAreaSVG.drawMarkers();
-        mainApp.playAreaSVG.drawDeckList();
-        mainApp.playAreaSVG.drawScoreBoard();
-        mainApp.playAreaSVG.drawMarkerHistory();
-    });
-    $('#playerName').on('input', function addPlayer() {
-        // can rename if player is set
-        var playerName = $('#playerName').val();
-        if (playerName === '') {
-            $('#addPlayer').attr('disabled', true);
-            $('#renamePlayer').hide();
-            $('#removePlayer').hide();
-        } else {
-            $('#addPlayer').attr('disabled', false);
-            // can't rename if new name is already in use, but can select that player
-            if (mainApp.playAreaSVG.tableData.players.hasOwnProperty(playerName)) {
-                $('#addPlayer').text('Select');
-                $('#renamePlayer').hide();
-                $('#removePlayer').show();
-            } else {
-                $('#addPlayer').text('Add');
-                if (mainApp.playAreaSVG.tableData.playerName !== '') {
-                    $('#renamePlayer').show();
-                }
-                $('#removePlayer').hide();
-            }
-            // if (mainApp.playAreaSVG.tableData.playerName !== '') {
-            //     $('#renamePlayer').show();
-            // } else {
-            //     $('#renamePlayer').hide();
-            // }
-        }
-    });
-    $('#playerName').trigger('input');
-    $('#addPlayer').on('click', function addPlayer() {
-        var newPlayer = $('#playerName').val();
-        mainApp.playAreaSVG.tableData.addPlayer(newPlayer);
-        mainApp.playAreaSVG.tableData.setPlayer(newPlayer);
-        mainApp.playAreaSVG.drawTable();
-        mainApp.playAreaSVG.drawCards();
-        mainApp.playAreaSVG.drawMarkers();
-        mainApp.playAreaSVG.drawDeckList();
-        mainApp.playAreaSVG.drawPlayerSelect();
-        mainApp.playAreaSVG.drawScoreBoard();
-        d3.select('#playerSelect').property('value', newPlayer);
-    });
-    $('#removePlayer').on('click', function removePlayer() {
-        var playerName = $('#playerSelect').val();
-        $('#playerSelect').val('');
-        $('#removePlayer').attr('');
-        mainApp.playAreaSVG.tableData.dbRemovePlayer(playerName);
-        mainApp.playAreaSVG.drawTable();
-        mainApp.playAreaSVG.drawCards();
-        mainApp.playAreaSVG.drawMarkers();
-        mainApp.playAreaSVG.drawDeckList();
-        mainApp.playAreaSVG.drawScoreBoard();
-    });
-    $('#renamePlayer').on('click', function renamePlayer() {
-        mainApp.playAreaSVG.tableData.renamePlayer($('#playerName').val());
-        mainApp.playAreaSVG.drawCards();
-        mainApp.playAreaSVG.drawMarkers();
-        mainApp.playAreaSVG.drawDeckList();
-    });
+
     $('#setTableImageUrl').on('click', function setTableImageUrl() {
         mainApp.playAreaSVG.tableData.setTableImageUrl($('#tableImageUrl').val());
-        mainApp.playAreaSVG.drawTable();
     });
     $('#setTableScaleAndDistance').on('click', function setTableRadius() {
         mainApp.playAreaSVG.tableData.setTableImageScaleAndDistance(
             $('#tableImageScale').val(),
             $('#tableDistance').val());
-        mainApp.playAreaSVG.drawTable();
     });
     $('#createMarker').on('click', function createMarker() {
         mainApp.playAreaSVG.tableData.createMarker($('#markerText').val());
-        mainApp.playAreaSVG.drawMarkers();
-        mainApp.playAreaSVG.drawMarkerHistory();
-    });
-    $('#resetPlayer').on('click', function resetPlayer() {
-        mainApp.playAreaSVG.tableData.resetPlayer();
-        mainApp.playAreaSVG.drawCards();
-        mainApp.playAreaSVG.drawMarkers();
-        mainApp.playAreaSVG.drawDeckList();
     });
     $('#setMarkerSize').on('click', function setMarkerSize() {
         mainApp.playAreaSVG.markerSize = $('#markerSize').val();
@@ -1711,10 +1421,97 @@ $(document).ready(function initialSetup() {
     });
     $('#setCardSize').on('click', function setCardSize() {
         mainApp.playAreaSVG.cardSize = $('#cardSize').val();
-        mainApp.playAreaSVG.drawMarkers();
     });
     $('#setDeckDealPoint').on('click', function setCardSize() {
         mainApp.playAreaSVG.tableData.setDeckDealPoint($('#deckDealX').val(),
                                                        $('#deckDealY').val());
+    });
+
+// hide action boxes when anything is clicked on (except the summoning element)
+    d3.select('body').on('click.hideActionBox', function hideDeckActions() {
+        mainApp.playAreaSVG.hideActionBoxes();
+    });
+    // undo checkbox toggles, the enclosing div click handler will do it
+    d3.select('.actionBox input').on('click', function logCheckboxClick(d) {
+        var checkbox = d3.select(this);
+        if (checkbox.property('checked')) {
+            checkbox.property('checked', false);
+        } else {
+            checkbox.property('checked', true);
+        }
+    });
+
+// deck actions
+    d3.select('#shuffleDeck').on('click', function shuffleDeck() {
+        var deckId = mainApp.playAreaSVG.deckActionTargetId;
+        mainApp.playAreaSVG.tableData.shuffleDeck(deckId);
+    });
+    d3.select('#listDeck').on('click', function listDeck() {
+        mainApp.playAreaSVG.drawCardList();
+        $('#deckListBox').show();
+    });
+    d3.select('#hideCardList').on('click', function hideCardList() {
+        $('#deckListBox').hide();
+    });
+    d3.select('#returnCardsToDeck').on('click', function returnCardsToDeck() {
+        var deckId = mainApp.playAreaSVG.deckActionTargetId;
+        mainApp.playAreaSVG.tableData.returnCardsToDeck(deckId);
+    });
+    d3.select('#removeDeck').on('click', function removeDeck() {
+        var deckId = mainApp.playAreaSVG.deckActionTargetId;
+        mainApp.playAreaSVG.tableData.removeDeck(deckId);
+    });
+    d3.select('#deckIsShared').on('click', function changeDeckSharing(d) {
+        var deckId = mainApp.playAreaSVG.deckActionTargetId,
+            isSharedCheckbox = d3.select('#deckIsShared input'),
+        // toggle the checkgox
+            isShared = !isSharedCheckbox.property('checked');
+        isSharedCheckbox.property('checked', isShared);
+        mainApp.playAreaSVG.tableData.setDeckSharedStatus(deckId, isShared);
+    });
+
+// player actions
+    d3.select('#selectPlayer').on('click', function selectPlayer() {
+        var playerId = mainApp.playAreaSVG.playerActionTargetId;
+        mainApp.playAreaSVG.tableData.setPlayer(playerId);
+        mainApp.redraw();
+    });
+    d3.select('#resetPlayer').on('click', function resetPlayer() {
+        var playerId = mainApp.playAreaSVG.playerActionTargetId;
+        mainApp.playAreaSVG.tableData.resetPlayer(playerId);
+    });
+    d3.select('#renamePlayer').on('click', function showPlayerRenameForm() {
+        var playerId = mainApp.playAreaSVG.playerActionTargetId,
+            playerRow = mainApp.playAreaSVG.playerActionTargetRow,
+            nameCell = playerRow.select('td.name'),
+            currentName = nameCell.text();
+        nameCell.html('');
+        nameCell.append('input')
+            .attr('value', currentName)
+            .on('input', function () {
+                if (mainApp.playAreaSVG.tableData.playerExists(this.value)) {
+                    nameCell.select('button.setName').attr('disabled', 'disabled');
+                } else {
+                    nameCell.select('button.setName').attr('disabled', null);
+                }
+            });
+        nameCell.append('button')
+            .classed('setName', true)
+            .text('Set')
+            .attr('disabled', 'disabled')
+            .on('click', function () {
+                var newName = nameCell.select('input').property('value');
+                mainApp.playAreaSVG.tableData.renamePlayer(playerId, newName);
+                nameCell.text(newName);
+            });
+        nameCell.append('button')
+            .text('Cancel')
+            .on('click', function () {
+                nameCell.text(currentName);
+            });
+    });
+    d3.select('#removePlayer').on('click', function removePlayer() {
+        var playerId = mainApp.playAreaSVG.playerActionTargetId;
+        mainApp.playAreaSVG.tableData.removePlayer(playerId);
     });
 });
