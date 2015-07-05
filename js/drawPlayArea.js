@@ -29,7 +29,7 @@ function TableData() {
             if(this.players[i].id == playerId) {
                 this.player = this.players[i];
                 $('#deckBox').show();
-                $('#createMarkerBox').show();
+                $('#markerBox').show();
                 break;
             }
         }
@@ -147,7 +147,7 @@ function TableData() {
             var card = cardsWithCounts[i];
             for (var j = 0; j < card.count; j++) {
                 cardNames.push(card.name);
-                cardImageUrls.push(card.image_url);
+                cardImageUrls.push(card.imageUrl);
             }
         }
 
@@ -337,11 +337,22 @@ function PlayAreaSVG() {
     this.deckActionTargetRow = null;
     this.playerActionTargetRow = null;
 
+    this.stationaryClickDetected = false;
+    this.previousTouch = null;
+
     this.init = function () {
         var canvasOffset;
         this.svg = d3.select('#playAreaSVG');
         this.resizeSVG();
         window.onresize = this.resizeSVG;
+        this.svg.call(this.panTable);
+        this.svg.on('click', function () {
+            if (self.stationaryClickDetected) {
+                d3.select('#enlargedCard image').remove();
+                d3.select('#cardButtons').selectAll("*").remove();
+                self.stationaryClickDetected = false;
+            }
+        });
         canvasOffset = $('#playAreaSVG').offset();
         this.x = canvasOffset.left;
         this.y = canvasOffset.top;
@@ -349,6 +360,73 @@ function PlayAreaSVG() {
         this.tableData.setRoom($('#roomName').val());
     };
 
+    this.panTable = d3.behavior.zoom();
+    this.panTable.on('zoomstart', function(d) {
+        self.stationaryClickDetected = true;
+    //     d3.select('#enlargedCard image').remove();
+        if (d3.event.sourceEvent.type == 'touchmove' &&
+            d3.event.sourceEvent.touches.length == 1) {
+            self.previousTouch = d3.event.sourceEvent.touches[0];
+        }
+    });
+    this.panTable.on('zoom', function(d) {
+        mainApp.coordDisplay.html('<' + d3.event.translate[0] + ', ' + d3.event.translate[1] + '>x' + d3.event.scale);
+        self.stationaryClickDetected = false;
+        var sourceEvent = d3.event.sourceEvent;
+        // d3.event.sourceEvent.stopPropagation();
+        // check if the scale has changed, within a margin of error
+        if (Math.round((self.scale - d3.event.scale) * 1000) != 0) {
+            self.previousTouch = null;
+            var zoomFocalPoint = null;
+            if (sourceEvent.type == 'wheel') {
+                zoomFocalPoint = self.getSVGCoordinates(
+                    sourceEvent.pageX,
+                    sourceEvent.pageY);
+            } else if (sourceEvent.type == 'touchmove') {
+                var pageXAverage = (sourceEvent.touches[0].pageX + sourceEvent.touches[1].pageX) / 2,
+                    pageYAverage = (sourceEvent.touches[0].pageY + sourceEvent.touches[1].pageY) / 2;
+                zoomFocalPoint = self.getSVGCoordinates(
+                    pageXAverage,
+                    pageYAverage);
+            }
+            var scaleFactor = d3.event.scale / self.scale;
+            self.scale = d3.event.scale;
+
+            self.viewBox.left = zoomFocalPoint.x - (zoomFocalPoint.x - self.viewBox.left) / scaleFactor;
+            self.viewBox.top = zoomFocalPoint.y - (zoomFocalPoint.y - self.viewBox.top) / scaleFactor;
+            self.viewBox.width = self.svgWidth / self.scale;
+            self.viewBox.height = self.svgHeight / self.scale;
+
+            d3.event.translate[0] = 0;
+            d3.event.translate[1] = 0;
+        }
+        else
+        {
+            if (d3.event.sourceEvent.type == 'mousemove') {
+                self.viewBox.left -= d3.event.sourceEvent.movementX / self.scale;
+                self.viewBox.top -= d3.event.sourceEvent.movementY / self.scale;
+            } else if (sourceEvent.type == 'touchmove') {
+                if (self.previousTouch !== null) {
+                    var dx = sourceEvent.touches[0].pageX - self.previousTouch.pageX,
+                        dy = sourceEvent.touches[0].pageY - self.previousTouch.pageY;
+                    self.viewBox.left -= dx / self.scale;
+                    self.viewBox.top -= dy / self.scale;
+                }
+                self.previousTouch = sourceEvent.touches[0];
+            }
+        }
+        self.applyViewBox();
+        // mainApp.setCoordDisplay(d3.event.translate[0], d3.event.translate[1]);
+    });
+    this.panTable.on('zoomend', function(d) {
+        self.previousTouch = null;
+    });
+    this.getSVGCoordinates = function (pageX, pageY) {
+        return {
+            x: Math.round(this.viewBox.left + pageX / this.scale),
+            y: Math.round(this.viewBox.top + pageY / this.scale)
+        };
+    };
     this.drag = d3.behavior.drag();
     this.drag.on('dragstart', function(d) {
         self.dragInProgress = true;
@@ -1136,30 +1214,7 @@ function PlayAreaSVG() {
                    self.viewBox.height;
         });
     };
-    this.startPan = function (pageX, pageY) {
-        this.startTranslation = {
-            x: pageX,
-            y: pageY
-        };
-        this.viewBoxStart = {
-            left: this.viewBox.left,
-            top: this.viewBox.top
-        };
-    };
-    this.continuePan = function (pageX, pageY) {
-        var mouseDelta = {
-            x: pageX - this.startTranslation.x,
-            y: pageY - this.startTranslation.y};
-        this.viewBox.left = this.viewBoxStart.left - mouseDelta.x / this.scale;
-        this.viewBox.top = this.viewBoxStart.top - mouseDelta.y / this.scale;
-        self.applyViewBox();
-    };
-    this.endPan = function (pageX, pageY) {
-        this.lastTranslation = {
-            x: pageX - this.x - this.startTranslation.x,
-            y: pageY - this.y - this.startTranslation.y
-        };
-    };
+
     this.zoomIn = function (pageX, pageY) {
         var zoomFactor = 1.1;
         this.scale *= zoomFactor;
@@ -1184,12 +1239,6 @@ function PlayAreaSVG() {
         this.viewBox.left = x - self.viewBox.width / 2;
         this.viewBox.top = y - self.viewBox.height / 2;
         this.applyViewBox();
-    };
-    this.getSVGCoordinates = function (pageX, pageY) {
-        return {
-            x: Math.round(this.viewBox.left + pageX / this.scale),
-            y: Math.round(this.viewBox.top + pageY / this.scale)
-        };
     };
 }
 
@@ -1268,35 +1317,6 @@ function MainApp() {
     this.setCoordDisplay = function (x, y) {
         this.coordDisplay.html('x: ' + x + ' y: ' + y);
     };
-    this.startMouse = function (pageX, pageY) {
-        // check this in case the cursor was released outside the document
-        // in which case the event would have been missed
-        if (this.mouseIsDown) {
-            this.playAreaSVG.endPan(pageX, pageY);
-        }
-        this.mouseIsDown = true;
-        this.playAreaSVG.startPan(pageX, pageY);
-    };
-    this.moveMouse = function (pageX, pageY) {
-        var mousePos = {x: 0, y: 0},
-            nearbyFeature = null;
-        // pan the map
-        if (this.mouseIsDown) {
-            this.playAreaSVG.continuePan(pageX, pageY);
-        // update cursor coordinates
-        } else {
-            mousePos = this.playAreaSVG.getSVGCoordinates(pageX,
-                                                          pageY);
-            this.setCoordDisplay(mousePos.x, mousePos.y);
-        }
-    };
-    this.endMouse = function (pageX, pageY) {
-        // check that the click started on the canvas
-        if (this.mouseIsDown) {
-            this.mouseIsDown = false;
-            this.playAreaSVG.endPan(pageX, pageY);
-        }
-    };
 }
 
 
@@ -1305,35 +1325,13 @@ $(document).ready(function initialSetup() {
     mainApp = new MainApp();
     mainApp.init();
 
-    $('#playAreaSVG').on({
-        'mousedown': function canvasMouseButtonPressed(event) {
-            mainApp.startMouse(event.pageX, event.pageY);
-        },
-        // provided by jquery.mousewheel.js
-        'mousewheel': function canvasMouseScrolled(event) {
-            if (event.deltaY > 0) {
-                mainApp.playAreaSVG.zoomIn(event.pageX,
-                                           event.pageY);
-            } else {
-                mainApp.playAreaSVG.zoomOut(event.pageX,
-                                            event.pageY);
-            }
-        },
-        'click': function hideButtons(event) {
-            d3.select('#cardButtons').selectAll("*").remove();
-            d3.select('#enlargedCard').selectAll("*").remove();
-        }
-    });
-    $(document.body).on({
-        'mousemove': function bodyMouseover(event) {
-            mainApp.moveMouse(event.pageX, event.pageY);
-        },
-        'mouseup': function bodyMouseup(event) {
-            mainApp.endMouse(event.pageX, event.pageY);
-        },
-        'mouseleave': function bodyMouseup(event) {
-            mainApp.endMouse(event.pageX, event.pageY);
-        }
+    $('.interfaceIcon').on('click', function toggleInterfaceSection() {
+        var icon = $(this),
+            content = icon.next('.interfaceContent');
+        icon.find('.sectionLabel').toggle();
+        icon.find('.sectionHideLabel').toggle();
+        // icon.hide();
+        content.toggle();
     });
 
     $('#updateData').on('click', mainApp.playAreaSVG.tableData.update);
@@ -1347,7 +1345,7 @@ $(document).ready(function initialSetup() {
     });
 
     $('#deckBox').hide();
-    $('#createMarkerBox').hide();
+    $('#markerBox').hide();
     $('#deckListBox').hide();
     $('#showDeckList').on('click', function showLoadDeckForm() {
         $('#deckListBox').toggle();
@@ -1386,11 +1384,7 @@ $(document).ready(function initialSetup() {
         $('#addDeckBox').hide();
     });
 
-    $('#settingsBox').hide();
-    $('#settingsHeader').on('click', function showLoadDeckForm() {
-        $('#settingsBox').toggle();
-    });
-    $('#settingsBox').hide();
+    $('#markerHistory').hide();
     $('#markerHistoryHeader').on('click', function showLoadDeckForm() {
         $('#markerHistory').toggle();
     });

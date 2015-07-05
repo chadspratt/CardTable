@@ -23,17 +23,33 @@ g.cards_in_hand image {
     left: 10px;
     max-width: 100px;
 }*/
+.interfaceSection {
+    background-color: #ffffff;
+    border: 1px solid #d3d3d3;
+    border-radius: 3px;
+    margin-bottom: 2%;
+    display: inline-block;
+}
 .interfaceIcon {
+    /*width: 50px;*/
+    height: 15px;
+    font-size: small;
+    word-wrap: break-word;
+}
+.sectionHideLabel {
+    display: none;
+}
+.interfaceContent {
     display: none;
 }
 #gameControls {
     position: absolute;
-    top: 10px;
-    left: 10px;
+    top: 5px;
+    left: 5px;
     max-width: 400px;
 }
 #gameControls > *{
-    padding-top: 10px;
+    padding-top: 5px;
     padding-bottom: 10px;
     border-bottom: 1px solid #999999;
 }
@@ -74,6 +90,9 @@ g.cards_in_hand image {
 }
 .actionBox {
     position: absolute;
+    background-color: #ffffff;
+    border: 1px solid #d3d3d3;
+    border-radius: 3px;
     /*off screen initially*/
     top: -1000px;
     left: -1000px;
@@ -92,9 +111,8 @@ g.cards_in_hand image {
     text-decoration: underline;
 }
 .overlayItem {
-    background-color: #ffffff;
-    border: 1px solid #d3d3d3;
-    border-radius: 3px;
+    /*background-color: transparent;*/
+    /*border: none;*/
     /*on top of everything else*/
     z-index: 1;
 }
