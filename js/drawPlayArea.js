@@ -1,5 +1,6 @@
 /*global $ */
-var mainApp;
+var mainApp,
+    tableStateURL = 'tableState.php';
 
 function TableData() {
     'use strict';
@@ -16,7 +17,7 @@ function TableData() {
 
     this.setRoom = function (roomName) {
         this.room = roomName;
-        $.post('tableState.php',
+        $.post(tableStateURL,
                 {
                     action: 'set_room',
                     roomName: this.room
@@ -47,7 +48,7 @@ function TableData() {
     };
     this.addPlayer = function (playerName) {
         if (playerName !== '') {
-            $.post('tableState.php',
+            $.post(tableStateURL,
                     {
                         action: 'add_player',
                         playerName: playerName
@@ -55,7 +56,7 @@ function TableData() {
         }
     };
     this.renamePlayer = function (playerId, newName) {
-        $.post('tableState.php',
+        $.post(tableStateURL,
                 {
                     action: 'update_player_name',
                     playerId: playerId,
@@ -64,7 +65,7 @@ function TableData() {
     };
     this.setTableImageUrl = function (tableImageUrl) {
         if (tableImageUrl !== this.player.imageUrl) {
-            $.post('tableState.php',
+            $.post(tableStateURL,
                     {
                         action: 'update_table_image_url',
                         playerId: this.player.id,
@@ -73,7 +74,7 @@ function TableData() {
         }
     };
     this.setTableImageScaleAndDistance = function (imageScale, imageDistance) {
-        $.post('tableState.php',
+        $.post(tableStateURL,
                 {
                     action: 'update_table_image_scale_and_distance',
                     playerId: this.player.id,
@@ -82,7 +83,7 @@ function TableData() {
                 });
     };
     this.setDeckDealPoint = function (x, y) {
-        $.post('tableState.php',
+        $.post(tableStateURL,
                 {
                     action: 'set_deck_deal_point',
                     playerId: this.player.id,
@@ -91,7 +92,7 @@ function TableData() {
                 });
     };
     this.updatePlayerScore = function (id, score) {
-        $.post('tableState.php',
+        $.post(tableStateURL,
                 {
                     action: 'update_player_score',
                     playerId: id,
@@ -99,7 +100,7 @@ function TableData() {
                 });
     };
     this.updateCardGeometry = function (card) {
-        $.post('tableState.php',
+        $.post(tableStateURL,
                 {
                     action: 'update_card_geometry',
                     id: card.id,
@@ -110,7 +111,7 @@ function TableData() {
                 });
     };
     this.updateMarkerGeometry = function (marker) {
-        $.post('tableState.php',
+        $.post(tableStateURL,
                 {
                     action: 'update_marker_geometry',
                     id: marker.id,
@@ -119,7 +120,7 @@ function TableData() {
                 });
     };
     this.removePlayer = function (playerId) {
-        $.post('tableState.php',
+        $.post(tableStateURL,
                 {
                     action: 'remove_player',
                     playerId: playerId
@@ -151,7 +152,7 @@ function TableData() {
             }
         }
 
-        $.post('tableState.php',
+        $.post(tableStateURL,
                 {
                     action: 'add_deck',
                     deckName: deckName,
@@ -178,7 +179,7 @@ function TableData() {
                 });
             }
 
-            $.post('tableState.php',
+            $.post(tableStateURL,
                     {
                         action: 'add_marker',
                         playerId: this.player.id,
@@ -190,7 +191,7 @@ function TableData() {
         }
     };
     this.resetPlayer = function () {
-        $.post('tableState.php',
+        $.post(tableStateURL,
                 {
                     action: 'reset_player',
                     playerId: this.player.id,
@@ -198,21 +199,21 @@ function TableData() {
         this.shuffleDeck();
     };
     this.shuffleDeck = function (deckId) {
-        $.post('tableState.php',
+        $.post(tableStateURL,
                 {
                     action: 'shuffle_deck',
                     deckId: deckId
                 });
     };
     this.returnCardsToDeck = function (deckId) {
-        $.post('tableState.php',
+        $.post(tableStateURL,
                 {
                     action: 'return_cards_to_deck',
                     deckId: deckId
                 });
     };
     this.removeDeck = function (deckId) {
-        $.post('tableState.php',
+        $.post(tableStateURL,
                 {
                     action: 'remove_deck',
                     deckId: deckId
@@ -223,7 +224,7 @@ function TableData() {
         if (!isShared) {
             ownerId = this.player.id;
         }
-        $.post('tableState.php',
+        $.post(tableStateURL,
                 {
                     action: 'update_deck_owner',
                     deckId: deckId,
@@ -231,7 +232,7 @@ function TableData() {
                 });
     };
     this.drawCard = function (deckId) {
-        $.post('tableState.php',
+        $.post(tableStateURL,
                 {
                     action: 'draw_card',
                     deckId: deckId,
@@ -249,7 +250,7 @@ function TableData() {
         if (targetZone !== 'deck') {
             playerId = this.player.id;
         }
-        $.post('tableState.php',
+        $.post(tableStateURL,
                 {
                     action: 'update_card_zone',
                     cardId: cardId,
@@ -259,7 +260,7 @@ function TableData() {
                 });
     };
     this.updateCardRotation = function (cardId, rotation) {
-        $.post('tableState.php',
+        $.post(tableStateURL,
                 {
                     action: 'update_card_rotation',
                     id: cardId,
@@ -275,7 +276,7 @@ function TableData() {
         this.updateCardRotation(card.id, card.rotation);
     };
     this.unrotatePlayerCards = function () {
-        $.post('tableState.php',
+        $.post(tableStateURL,
                 {
                     action: 'unrotate_player_cards',
                     playerId: this.player.id
@@ -332,8 +333,11 @@ function PlayAreaSVG() {
     this.dragInProgress = false;
     this.playerRotations = {};
 
+    this.cardActionTargetId = null;
     this.deckActionTargetId = null;
     this.playerActionTargetId = null;
+
+    this.cardActionTarget = null;
     this.deckActionTargetRow = null;
     this.playerActionTargetRow = null;
 
@@ -358,12 +362,12 @@ function PlayAreaSVG() {
         this.y = canvasOffset.top;
         this.tableData = new TableData();
         this.tableData.setRoom($('#roomName').val());
+        self.hideActionBoxes();
     };
 
     this.panTable = d3.behavior.zoom();
     this.panTable.on('zoomstart', function(d) {
         self.stationaryClickDetected = true;
-    //     d3.select('#enlargedCard image').remove();
         if (d3.event.sourceEvent.type == 'touchmove' &&
             d3.event.sourceEvent.touches.length == 1) {
             self.previousTouch = d3.event.sourceEvent.touches[0];
@@ -679,7 +683,8 @@ function PlayAreaSVG() {
             return a.ordering - b.ordering;
         });
         cards.on('click.enlarge', self.drawEnlargedCard);
-        cards.on('click.buttons', self.drawCardButtons);
+        cards.on('click.touchMenu', self.showCardActionMenu);
+        cards.on('contextmenu', self.showCardActionMenu);
     };
     this.drawMarkers = function () {
         var playerArray = this.tableData.players;
@@ -739,7 +744,7 @@ function PlayAreaSVG() {
         markers.call(self.drag);
     };
     this.drawEnlargedCard = function (d) {
-        d3.event.stopPropagation(); // silence other listeners
+        d3.event.stopPropagation();
         var originCard = d3.select(this);
         d.originCard = originCard;
 
@@ -787,172 +792,49 @@ function PlayAreaSVG() {
             mainApp.enlargedCard.call(self.drag);
             newCardData.exit().remove();
 
-            mainApp.enlargedCard.call(self.drawCardButtons);
-            // mainApp.enlargedCard.on('click.enlarge', self.drawEnlargedCard);
-            mainApp.enlargedCard.on('click.enlarge', function () {
+            self.hideActionBoxes();
+
+            mainApp.enlargedCard.on('click', function (d) {
                 d3.event.stopPropagation();
+                self.hideActionBoxes();
             });
-            mainApp.enlargedCard.on('click.buttons', self.drawCardButtons);
+            mainApp.enlargedCard.on('contextmenu', self.showCardActionMenu);
             // });
         // }
     };
-    this.drawCardButtons = function (d) {
-        // d3.event.stopPropagation(); // silence other listeners
-        d3.select('#cardButtons').selectAll("*").remove();
+    this.showCardActionMenu = function (d) {
+        d3.event.preventDefault();
+        d3.event.stopPropagation();
         if(self.tableData.player.id === d.playerId)
         {
-            // show buttons for own cards
-            var card = d;
-            // x/y/width/height are percentages of enlarged card width
-            var buttonData = {
-                rotateLeft: {
-                    text: 'L',
-                    x: 10,
-                    y: 20,
-                    width: 10,
-                    height: 10
-                },
-                rotateRight: {
-                    text: 'R',
-                    x: 80,
-                    y: 20,
-                    width: 10,
-                    height: 10
-                },
-                play: {
-                    text: 'Play',
-                    x: 30,
-                    y: 20,
-                    width: 40,
-                    height: 10
-                },
-                playFaceDown: {
-                    text: 'Play Face Down',
-                    x: 19,
-                    y: 50,
-                    width: 62,
-                    height: 10
-                },
-                hand: {
-                    text: 'Hand',
-                    x: 26,
-                    y: 20,
-                    width: 47,
-                    height: 10
-                },
-                deckBottom: {
-                    text: 'B',
-                    x: 10,
-                    y: 35,
-                    width: 10,
-                    height: 10
-                },
-                unrotate: {
-                    text: 'Unrotate All',
-                    x: 26,
-                    y: 35,
-                    width: 47,
-                    height: 10
-                },
-                deckTop: {
-                    text: 'T',
-                    x: 80,
-                    y: 35,
-                    width: 10,
-                    height: 10
-                }
-            },
-                buttons = [];
+            self.cardActionTargetId = d.id;
+            self.cardActionTarget = d;
 
-            if (d.zone === 'hand') {
-                buttons = [
-                    buttonData.play,
-                    buttonData.playFaceDown,
-                    buttonData.deckTop,
-                    buttonData.deckBottom
-                ];
-            } else if (d.zone === 'inPlay') {
-                buttons = [
-                    buttonData.rotateLeft,
-                    buttonData.hand,
-                    buttonData.rotateRight,
-                    buttonData.deckTop,
-                    buttonData.unrotate,
-                    buttonData.deckBottom,
-                    buttonData.playFaceDown,
-                ];
-            } else if (d.zone === 'inPlayFaceDown') {
-                buttons = [
-                    buttonData.rotateLeft,
-                    buttonData.play,
-                    buttonData.rotateRight,
-                    buttonData.deckTop,
-                    buttonData.unrotate,
-                    buttonData.deckBottom
-                ];
+            d3.selectAll('#cardActionBox div')
+                .style('display', 'none');
+            d3.selectAll('.' + d.zone)
+                .style('display', '');
+
+            // move box on-screen
+            self.hideActionBoxes();
+
+            d3.select('#cardActionBox')
+                .classed('mobileCardActions', d3.event.type == 'click');
+
+            if (d3.event.type == 'contextmenu') {
+                d3.select('#cardActionBox')
+                    .style('left', d3.event.pageX + 'px')
+                    .style('bottom', '')
+                    .style('top', d3.event.pageY + 'px')
+                    .style('width', '')
+                    .style('display', '');
+            } else {
+                d3.select('#cardActionBox')
+                    .style('left', '0px')
+                    .style('bottom', '0px')
+                    .style('top', '')
+                    .style('width', '100%');
             }
-
-            var cardButtons = d3.select('#cardButtons').selectAll('g')
-                .data(buttons, function (d) { return d.text });
-            cardButtons.enter().append('g')
-                .classed('button', true)
-                .on('click', function (d) {
-                    if (d.text === 'L') {
-                        self.tableData.rotateLeft(card);
-                    } else if (d.text === 'R') {
-                        self.tableData.rotateRight(card);
-                    } else if (d.text === 'T') {
-                        self.tableData.updateCardZone(card.id,
-                                                      'deck',
-                                                      'top');
-                    } else if (d.text === 'B') {
-                        self.tableData.updateCardZone(card.id,
-                                                      'deck',
-                                                      'bottom');
-                    } else if (d.text === 'Play') {
-                        self.tableData.updateCardZone(card.id,
-                                                      'inPlay');
-                    } else if (d.text === 'Play Face Down') {
-                        self.tableData.updateCardZone(card.id,
-                                                      'inPlayFaceDown');
-                    } else if (d.text === 'Hand') {
-                        self.tableData.updateCardZone(card.id,
-                                                      'hand');
-                    } else if (d.text === 'Unrotate All') {
-                        self.tableData.unrotatePlayerCards();
-                    }
-                    d3.select('#cardButtons').selectAll("*").remove();
-                    // d3.select('#enlargedCard').selectAll("*").remove();
-                });
-            cardButtons.append('rect')
-                .attr('x', function (d) {
-                    return card.enlargedX + card.enlargedWidth / 100 * d.x;
-                })
-                .attr('y', function (d) {
-                    return card.enlargedY + card.enlargedWidth / 100 * d.y;
-                })
-                .attr('width', function (d) {
-                    return card.enlargedWidth / 100 * d.width;
-                })
-                .attr('height', function (d) {
-                    return card.enlargedWidth / 100 * d.height;
-                })
-                .attr('rx', 5)
-                .attr('ry', 5);
-            cardButtons.append('text')
-                .html(function (d) {
-                    return d.text;
-                })
-                .style('font-size', function (d) {
-                    var size = 1 / self.scale
-                    return size + 'em';
-                })
-                .attr('x', function (d) {
-                    return card.enlargedX + card.enlargedWidth / 100 * (d.x + 2);
-                })
-                .attr('y', function (d) {
-                    return card.enlargedY + card.enlargedWidth / 100 * (d.y + 7);
-                });
         }
     }
     this.drawScoreBoard = function () {
@@ -1274,7 +1156,7 @@ function MainApp() {
             if (initial) {
                 args.lastUpdateId = -1;
             }
-            $.post('tableState.php',
+            $.post(tableStateURL,
                     args,
                     function (data) {
                         // don't update while something is being drug
@@ -1433,6 +1315,47 @@ $(document).ready(function initialSetup() {
         } else {
             checkbox.property('checked', true);
         }
+    });
+
+// card actions
+    d3.select('#playCard').on('click', function playCard() {
+        var cardId = mainApp.playAreaSVG.cardActionTargetId;
+        mainApp.playAreaSVG.tableData.updateCardZone(cardId,
+                                                     'inPlay');
+    });
+    d3.select('#rotateCardLeft').on('click', function rotateCardLeft() {
+        var card = mainApp.playAreaSVG.cardActionTarget;
+        mainApp.playAreaSVG.tableData.rotateLeft(card);
+    });
+    d3.select('#rotateCardRight').on('click', function rotateCardRight() {
+        var card = mainApp.playAreaSVG.cardActionTarget;
+        mainApp.playAreaSVG.tableData.rotateRight(card);
+    });
+    d3.select('#unrotateAllOwnCards').on('click', function unrotateAllOwnCards() {
+        var cardId = mainApp.playAreaSVG.cardActionTargetId;
+        mainApp.playAreaSVG.tableData.unrotatePlayerCards();
+    });
+    d3.select('#playCardFaceDown').on('click', function playCardFaceDown() {
+        var cardId = mainApp.playAreaSVG.cardActionTargetId;
+        mainApp.playAreaSVG.tableData.updateCardZone(cardId,
+                                                     'inPlayFaceDown');
+    });
+    d3.select('#moveCardToHand').on('click', function moveCardToHand() {
+        var cardId = mainApp.playAreaSVG.cardActionTargetId;
+        mainApp.playAreaSVG.tableData.updateCardZone(cardId,
+                                                     'hand');
+    });
+    d3.select('#moveCardToTopOfDeck').on('click', function moveCardToTopOfDeck() {
+        var cardId = mainApp.playAreaSVG.cardActionTargetId;
+        mainApp.playAreaSVG.tableData.updateCardZone(cardId,
+                                                     'deck',
+                                                     'top');
+    });
+    d3.select('#moveCardToBottomOfDeck').on('click', function moveCardToBottomOfDeck() {
+        var cardId = mainApp.playAreaSVG.cardActionTargetId;
+        mainApp.playAreaSVG.tableData.updateCardZone(cardId,
+                                                     'deck',
+                                                     'bottom');
     });
 
 // deck actions

@@ -94,8 +94,8 @@ g.cards_in_hand image {
     border: 1px solid #d3d3d3;
     border-radius: 3px;
     /*off screen initially*/
-    top: -1000px;
-    left: -1000px;
+    /*top: -1000px;*/
+    /*left: -1000px;*/
 }
 .actionBox div:hover {
     background-color: lavender;
@@ -124,4 +124,16 @@ g.cards_in_hand image {
 }
 .marker rect {
     fill: rgb(155, 255, 155);
+}
+
+div.mobileCardActions {
+    background-color: darkslategray;
+    padding: 5px
+}
+div.mobileCardActions div {
+    background-color: #ffffff;
+    border: 1px solid #d3d3d3;
+    border-radius: 3px;
+    margin-bottom: 5px;
+    display: inline-block;
 }

@@ -107,3 +107,7 @@ g.cards_in_hand image {
 .marker rect {
     fill: rgb(155, 255, 155);
 }
+
+div.mobileCardActions {
+    display: none;
+}
