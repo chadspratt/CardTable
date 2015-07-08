@@ -407,8 +407,13 @@ function PlayAreaSVG() {
         else
         {
             if (d3.event.sourceEvent.type == 'mousemove') {
-                self.viewBox.left -= d3.event.sourceEvent.movementX / self.scale;
-                self.viewBox.top -= d3.event.sourceEvent.movementY / self.scale;
+                if (d3.event.sourceEvent.movementX !== undefined) {
+                    self.viewBox.left -= d3.event.sourceEvent.movementX / self.scale;
+                    self.viewBox.top -= d3.event.sourceEvent.movementY / self.scale;
+                } else if (d3.event.sourceEvent.mozMovementX !== undefined)  {
+                    self.viewBox.left -= d3.event.sourceEvent.mozMovementX / self.scale;
+                    self.viewBox.top -= d3.event.sourceEvent.mozMovementY / self.scale;
+                }
             } else if (sourceEvent.type == 'touchmove') {
                 if (self.previousTouch !== null) {
                     var dx = sourceEvent.touches[0].pageX - self.previousTouch.pageX,
