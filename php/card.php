@@ -13,7 +13,8 @@ class Card
         $cards = Card::_GetCards($queryString, $playerId);
         $zones = array("hand" => [],
                        "inPlay" => [],
-                       "inPlayFaceDown" => []);
+                       "inPlayFaceDown" => [],
+                       "dealtFaceDown" => []);
         foreach ($cards as $card)
         {
             array_push($zones[$card["zone"]], $card);
@@ -147,12 +148,30 @@ class Card
         $getTopCardIdQuery->execute();
         $getTopCardIdQuery->bind_result($cardId);
         $getTopCardIdQuery->fetch();
-        var_dump($cardId);
         $getTopCardIdQuery->close();
-        var_dump($cardId);
         $connection->close();
-        var_dump($cardId);
         Card::MoveToZone($cardId, $playerId, "hand", "top");
+    }
+
+    public static function DrawCardFaceDown($deckId, $playerId)
+    {
+        require_once "../../db_connect/cards.inc";
+        $connection = GetDatabaseConnection();
+
+        $getTopCardIdQuery = $connection->prepare(
+            "SELECT id
+             FROM card
+             WHERE deckId = ? AND zone = 'deck' AND ordering = (
+                SELECT max(ordering)
+                FROM card
+                WHERE deckId = ? AND zone = 'deck')");
+        $getTopCardIdQuery->bind_param("ii", $deckId, $deckId);
+        $getTopCardIdQuery->execute();
+        $getTopCardIdQuery->bind_result($cardId);
+        $getTopCardIdQuery->fetch();
+        $getTopCardIdQuery->close();
+        $connection->close();
+        Card::MoveToZone($cardId, $playerId, "dealtFaceDown", "top");
     }
 
     public static function MoveToZone($cardId, $playerId, $zone, $topOrBottom)
@@ -222,10 +241,6 @@ class Card
              WHERE id = ?");
         $updateCardZoneQuery->bind_param("siii", $zone, $ordering, $playerId,
                                          $cardId);
-        var_dump($zone);
-        var_dump($ordering);
-        var_dump($playerId);
-        var_dump($cardId);
         $updateCardZoneQuery->execute();
         $updateCardZoneQuery->close();
         $connection->close();

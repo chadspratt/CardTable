@@ -14,6 +14,7 @@ function TableData() {
     this.decks = {};
     this.tableRadius = 750;
     this.markerHistory = [];
+    this.drawDeckFaceDownLedger = {};
 
     this.setRoom = function (roomName) {
         this.room = roomName;
@@ -231,10 +232,25 @@ function TableData() {
                     ownerId: ownerId
                 });
     };
+    this.setDeckDrawFaceDownStatus = function (deckId, drawFaceDown) {
+        this.drawDeckFaceDownLedger[deckId] = drawFaceDown;
+    };
     this.drawCard = function (deckId) {
+        if (this.drawDeckFaceDownLedger[deckId]) {
+            this.drawCardFaceDown(deckId);
+        } else {
+            $.post(tableStateURL,
+                    {
+                        action: 'draw_card',
+                        deckId: deckId,
+                        playerId: this.player.id
+                    });
+        }
+    };
+    this.drawCardFaceDown = function (deckId) {
         $.post(tableStateURL,
                 {
-                    action: 'draw_card',
+                    action: 'draw_card_face_down',
                     deckId: deckId,
                     playerId: this.player.id
                 });
@@ -599,7 +615,8 @@ function PlayAreaSVG() {
                     yOffset = -1 * self.tableData.tableRadius * (playerArray.length);
                 self.playerRotations[d.id] = {
                     degrees: rotation,
-                    radians: rotation  * (Math.PI / 180)};
+                    radians: rotation  * (Math.PI / 180),
+                    yOffset: yOffset};
 
                 return 'rotate(' + rotation + ' 0 ' + yOffset + ')';
             });
@@ -625,7 +642,13 @@ function PlayAreaSVG() {
                 function (d) { return d.name; });
         zones.enter().append('g')
             .classed('cards_in_hand',
-                    function (d) { return d.name === 'hand'; });
+                    function (d) { return d.name === 'hand'; })
+            .classed('cards_in_play',
+                    function (d) { return d.name === 'inPlay'; })
+            .classed('cards_in_play_face_down',
+                    function (d) { return d.name === 'inPlayFaceDown'; })
+            .classed('cards_dealt_face_down',
+                    function (d) { return d.name === 'dealtFaceDown'; });
         zones.exit().remove();
 
         var cards = zones.selectAll('image')
@@ -644,8 +667,9 @@ function PlayAreaSVG() {
                 return d.id;
             })
             .attr('xlink:href', function (d) {
-                if (d.zone !== 'inPlayFaceDown' ||
-                    d.playerId === self.tableData.player.id) {
+                if (d.zone !== 'dealtFaceDown' &&
+                    (d.zone !== 'inPlayFaceDown' ||
+                     d.playerId === self.tableData.player.id)) {
                     return d.imageUrl;
                 } else {
                     return 'cardback.png';
@@ -753,7 +777,9 @@ function PlayAreaSVG() {
         var originCard = d3.select(this);
         d.originCard = originCard;
 
-        // if (self.scale < 0.8) {
+        if (d.zone !== 'dealtFaceDown' &&
+            (d.zone !== 'inPlayFaceDown' ||
+             d.playerId === self.tableData.player.id)) {
             var enlargedScale = self.scale / self.cardSize,
                 enlargedCardZone = d3.select('#enlargedCard'),
                 player = d3.select(d.originCard[0][0].parentNode.parentNode);
@@ -804,13 +830,13 @@ function PlayAreaSVG() {
                 self.hideActionBoxes();
             });
             mainApp.enlargedCard.on('contextmenu', self.showCardActionMenu);
-            // });
-        // }
+        }
     };
     this.showCardActionMenu = function (d) {
         d3.event.preventDefault();
         d3.event.stopPropagation();
-        if(self.tableData.player.id === d.playerId)
+        if(self.tableData.player.id === d.playerId ||
+           d.zone == 'dealtFaceDown')
         {
             self.cardActionTargetId = d.id;
             self.cardActionTarget = d;
@@ -931,6 +957,7 @@ function PlayAreaSVG() {
 
         newDecks.each(function (d) {
             var deckRow = d3.select(this);
+            d.drawFaceDown = false;
             deckRow.append('td')
                 .classed('name', true)
                 .html(function (d) {
@@ -1313,7 +1340,7 @@ $(document).ready(function initialSetup() {
         mainApp.playAreaSVG.hideActionBoxes();
     });
     // undo checkbox toggles, the enclosing div click handler will do it
-    d3.select('.actionBox input').on('click', function logCheckboxClick(d) {
+    d3.select('.actionBox input').on('click', function logCheckboxClick() {
         var checkbox = d3.select(this);
         if (checkbox.property('checked')) {
             checkbox.property('checked', false);
@@ -1324,8 +1351,13 @@ $(document).ready(function initialSetup() {
 
 // card actions
     d3.select('#playCard').on('click', function playCard() {
-        var cardId = mainApp.playAreaSVG.cardActionTargetId;
-        mainApp.playAreaSVG.tableData.updateCardZone(cardId,
+        var card = mainApp.playAreaSVG.cardActionTarget;
+        if (cardActionTarget.playerId !== mainApp.playAreaSVG.tableData.player.id) {
+            mainApp.playAreaSVG.tableData.updateOwner(
+                cardActionTarget,
+                mainApp.playAreaSVG.tableData.player.id);
+        }
+        mainApp.playAreaSVG.tableData.updateCardZone(card.id,
                                                      'inPlay');
     });
     d3.select('#rotateCardLeft').on('click', function rotateCardLeft() {
@@ -1383,13 +1415,21 @@ $(document).ready(function initialSetup() {
         var deckId = mainApp.playAreaSVG.deckActionTargetId;
         mainApp.playAreaSVG.tableData.removeDeck(deckId);
     });
-    d3.select('#deckIsShared').on('click', function changeDeckSharing(d) {
+    d3.select('#deckIsShared').on('click', function changeDeckSharing() {
         var deckId = mainApp.playAreaSVG.deckActionTargetId,
             isSharedCheckbox = d3.select('#deckIsShared input'),
-        // toggle the checkgox
+        // toggle the checkbox
             isShared = !isSharedCheckbox.property('checked');
         isSharedCheckbox.property('checked', isShared);
         mainApp.playAreaSVG.tableData.setDeckSharedStatus(deckId, isShared);
+    });
+    d3.select('#drawFaceDown').on('click', function changeDeckSharing() {
+        var deckId = mainApp.playAreaSVG.deckActionTargetId,
+            drawFaceDownCheckbox = d3.select('#drawFaceDown input'),
+        // toggle the checkbox
+            drawFaceDown = !drawFaceDownCheckbox.property('checked');
+        drawFaceDownCheckbox.property('checked', drawFaceDown);
+        mainApp.playAreaSVG.tableData.setDeckDrawFaceDownStatus(deckId, drawFaceDown);
     });
 
 // player actions

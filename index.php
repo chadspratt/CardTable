@@ -194,15 +194,16 @@
   <div id="removeDeck" class="deleteItem">Remove</div>
   <div id="deckIsShared">Shared<input type="checkbox"></div>
   <div id="deckIsLocked">Locked<input type="checkbox"></div>
+  <div id="drawFaceDown">Draw Face Down<input type="checkbox"></div>
 </div>
 
 <div id="cardActionBox" class="overlayItem actionBox">
-  <div id="playCard" class="hand inPlayFaceDown">Play</div>
+  <div id="playCard" class="hand inPlayFaceDown dealtFaceDown">Play</div>
   <div id="rotateCardLeft" class="inPlay inPlayFaceDown">Rotate Left</div>
   <div id="rotateCardRight" class="inPlay inPlayFaceDown">Rotate Right</div>
   <div id="unrotateAllOwnCards" class="inPlay inPlayFaceDown">Unrotate All</div>
   <div id="playCardFaceDown" class="hand inPlay">Play Facedown</div>
-  <div id="moveCardToHand" class="inPlay">Put in Hand</div>
+  <div id="moveCardToHand" class="inPlay dealtFaceDown">Put in Hand</div>
   <div id="moveCardToTopOfDeck" class="hand inPlay inPlayFaceDown">Put on Deck Top</div>
   <div id="moveCardToBottomOfDeck" class="hand inPlay inPlayFaceDown">Put on Deck Bottom</div>
 </div>

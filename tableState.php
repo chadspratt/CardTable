@@ -210,6 +210,11 @@ function ProcessRequest($args)
             Card::DrawCard($args["deckId"],
                            $args["playerId"]);
         }
+        elseif ($args["action"] === "draw_card_face_down")
+        {
+            Card::DrawCardFaceDown($args["deckId"],
+                                   $args["playerId"]);
+        }
         elseif ($args["action"] === "update_card")
         {
             Card::UpdateCard($args["cardId"],
