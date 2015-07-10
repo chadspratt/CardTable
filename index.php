@@ -198,14 +198,15 @@
 </div>
 
 <div id="cardActionBox" class="overlayItem actionBox">
-  <div id="playCard" class="hand inPlayFaceDown dealtFaceDown">Play</div>
+  <div id="playCard" class="hand inPlayFaceDown notYours">Play</div>
   <div id="rotateCardLeft" class="inPlay inPlayFaceDown">Rotate Left</div>
   <div id="rotateCardRight" class="inPlay inPlayFaceDown">Rotate Right</div>
   <div id="unrotateAllOwnCards" class="inPlay inPlayFaceDown">Unrotate All</div>
   <div id="playCardFaceDown" class="hand inPlay">Play Facedown</div>
-  <div id="moveCardToHand" class="inPlay dealtFaceDown">Put in Hand</div>
+  <div id="moveCardToHand" class="inPlay inPlayFaceDown notYours">Put in Hand</div>
   <div id="moveCardToTopOfDeck" class="hand inPlay inPlayFaceDown">Put on Deck Top</div>
   <div id="moveCardToBottomOfDeck" class="hand inPlay inPlayFaceDown">Put on Deck Bottom</div>
+  <div id="changeCardOwner" class="hand inPlay inPlayFaceDown">Give to <select id="changeCardOwnerSelect"></select></div>
 </div>
 
 <div id="tableActionBox" class="overlayItem actionBox">
