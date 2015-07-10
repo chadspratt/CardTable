@@ -283,24 +283,31 @@ function ProcessRequest($args)
         {
             Card::UnrotatePlayerCards($args["playerId"]);
         }
-        elseif ($args["action"] === "remove")
+        elseif ($args["action"] === "update_card_owner")
         {
-            $removeQuery->bind_param("sssi",
-                                     $args["room"],
-                                     $args["playerName"],
-                                     $args["type"],
-                                     $args["id"]);
-            $removeQuery->execute();
-            $removeQuery->close();
+            Card::UpdateOwner($args["cardId"],
+                              $args["newOwnerId"],
+                              $args["newX"],
+                              $args["newY"]);
         }
-        elseif ($args["action"] === "remove_player_objects")
-        {
-            $removePlayerObjectsQuery->bind_param("ss",
-                                           $args["room"],
-                                           $args["playerName"]);
-            $removePlayerObjectsQuery->execute();
-            $removePlayerObjectsQuery->close();
-        }
+        // elseif ($args["action"] === "remove")
+        // {
+        //     $removeQuery->bind_param("sssi",
+        //                              $args["room"],
+        //                              $args["playerName"],
+        //                              $args["type"],
+        //                              $args["id"]);
+        //     $removeQuery->execute();
+        //     $removeQuery->close();
+        // }
+        // elseif ($args["action"] === "remove_player_objects")
+        // {
+        //     $removePlayerObjectsQuery->bind_param("ss",
+        //                                    $args["room"],
+        //                                    $args["playerName"]);
+        //     $removePlayerObjectsQuery->execute();
+        //     $removePlayerObjectsQuery->close();
+        // }
         elseif ($args["action"] === "remove_player")
         {
             Player::Remove($args["playerId"]);
