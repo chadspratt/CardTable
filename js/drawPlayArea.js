@@ -310,6 +310,16 @@ function TableData() {
                     playerId: this.player.id
                 });
     };
+    this.updateOwner = function (cardId, newOwnerId, newX, newY) {
+        $.post(tableStateURL,
+                {
+                    action: 'update_card_owner',
+                    cardId: cardId,
+                    newOwnerId: newOwnerId,
+                    newX: newX,
+                    newY: newY
+                });
+    };
     // get the decks owned by this.player and shared decks
     this.getDeckArray = function () {
         var deckArray = [],
@@ -639,11 +649,11 @@ function PlayAreaSVG() {
                     } else {
                         // don't draw other player's hands
                         for (var zone in d.zones) {
-                            if (zone != 'hand') {
+                            // if (zone != 'hand') {
                                     zones.push({
                                         name: d.zones[zone].name,
                                         cards: d.zones[zone].cards});
-                            }
+                            // }
                         }
                     }
                     return zones;
@@ -676,12 +686,13 @@ function PlayAreaSVG() {
                 return d.id;
             })
             .attr('xlink:href', function (d) {
-                if (d.zone !== 'dealtFaceDown' &&
-                    (d.zone !== 'inPlayFaceDown' ||
-                     d.playerId === self.tableData.player.id)) {
-                    return d.imageUrl;
-                } else {
+                if (d.zone == 'dealtFaceDown' ||
+                    d.zone == 'inPlayFaceDown' ||
+                    (d.zone == 'hand' &&
+                     d.playerId != self.tableData.player.id)) {
                     return 'cardback.png';
+                } else {
+                    return d.imageUrl;
                 }
             })
             .attr('x', function (d, i) {
@@ -786,9 +797,9 @@ function PlayAreaSVG() {
         var originCard = d3.select(this);
         d.originCard = originCard;
 
-        if (d.zone !== 'dealtFaceDown' &&
-            (d.zone !== 'inPlayFaceDown' ||
-             d.playerId === self.tableData.player.id)) {
+        if (d.zone === 'inPlay' ||
+            (d.playerId === self.tableData.player.id &&
+             d.zone !== 'dealtFaceDown')) {
             var enlargedScale = self.scale / self.cardSize,
                 enlargedCardZone = d3.select('#enlargedCard'),
                 player = d3.select(d.originCard[0][0].parentNode.parentNode);
@@ -844,37 +855,45 @@ function PlayAreaSVG() {
     this.showCardActionMenu = function (d) {
         d3.event.preventDefault();
         d3.event.stopPropagation();
-        if(self.tableData.player.id === d.playerId ||
-           d.zone == 'dealtFaceDown')
-        {
-            self.cardActionTargetId = d.id;
-            self.cardActionTarget = d;
+        var zone = d.zone;
+        if(self.tableData.player.id !== d.playerId ||
+           d.zone === 'dealtFaceDown') {
+            zone = 'notYours';
+        }
+        self.cardActionTargetId = d.id;
+        self.cardActionTarget = d;
 
-            d3.selectAll('#cardActionBox div')
-                .style('display', 'none');
-            d3.selectAll('.' + d.zone)
-                .style('display', '');
+        d3.selectAll('#cardActionBox div')
+            .style('display', 'none');
+        d3.selectAll('#cardActionBox div.' + zone)
+            .style('display', '');
 
-            // move box on-screen
-            self.hideActionBoxes();
+        var changeOwnerOptions = d3.select('#changeCardOwnerSelect').selectAll('option')
+            .data(self.tableData.players);
+        changeOwnerOptions.enter().append('option')
+            .attr('value', function (d) { return d.id; })
+            .html(function (d) { return d.name; });
+        changeOwnerOptions.exit().remove();
 
+        // move box on-screen
+        self.hideActionBoxes();
+
+        d3.select('#cardActionBox')
+            .classed('mobileCardActions', d3.event.type == 'click');
+
+        if (d3.event.type == 'contextmenu') {
             d3.select('#cardActionBox')
-                .classed('mobileCardActions', d3.event.type == 'click');
-
-            if (d3.event.type == 'contextmenu') {
-                d3.select('#cardActionBox')
-                    .style('left', d3.event.pageX + 'px')
-                    .style('bottom', '')
-                    .style('top', d3.event.pageY + 'px')
-                    .style('width', '')
-                    .style('display', '');
-            } else {
-                d3.select('#cardActionBox')
-                    .style('left', '0px')
-                    .style('bottom', '0px')
-                    .style('top', '')
-                    .style('width', '100%');
-            }
+                .style('left', d3.event.pageX + 'px')
+                .style('bottom', '')
+                .style('top', d3.event.pageY + 'px')
+                .style('width', '')
+                .style('display', '');
+        } else {
+            d3.select('#cardActionBox')
+                .style('left', '0px')
+                .style('bottom', '0px')
+                .style('top', '')
+                .style('width', '100%');
         }
     }
     this.drawScoreBoard = function () {
@@ -1138,6 +1157,48 @@ function PlayAreaSVG() {
         });
     };
 
+    this.updateOwner = function (card, newOwnerId) {
+        var cardCenter = {
+                x: card.x + card.width / 2,
+                y: card.y + card.height / 2
+            },
+            currentTransform = this.playerRotations[card.playerId],
+            newTransform = this.playerRotations[newOwnerId],
+            // undo current transform
+            radians = -currentTransform.radians,
+            rotationCenter = {
+                x: 0,
+                y: currentTransform.yOffset
+            },
+            cos = Math.cos(radians),
+            sin = Math.sin(radians),
+            nx = (cos * (cardCenter.x - rotationCenter.x)) -
+                 (sin * (cardCenter.y - rotationCenter.y)) +
+                  rotationCenter.x,
+            ny = (sin * (cardCenter.x - rotationCenter.x)) +
+                 (cos * (cardCenter.y - rotationCenter.y)) +
+                  rotationCenter.y;
+        // apply new transform
+        radians = newTransform.radians;
+        rotationCenter = {
+            x: 0,
+            y: newTransform.yOffset
+        };
+        cos = Math.cos(radians);
+        sin = Math.sin(radians);
+        nx = (cos * (nx - rotationCenter.x)) -
+             (sin * (ny - rotationCenter.y)) +
+              rotationCenter.x;
+        ny = (sin * (nx - rotationCenter.x)) +
+             (cos * (ny - rotationCenter.y)) +
+              rotationCenter.y;
+
+        nx -= card.width / 2;
+        ny -= card.height / 2;
+
+        this.tableData.updateOwner(card.id, newOwnerId, nx, ny);
+    };
+
     this.zoomIn = function (pageX, pageY) {
         var zoomFactor = 1.1;
         this.scale *= zoomFactor;
@@ -1174,9 +1235,6 @@ function MainApp() {
     this.mouseIsDown = false;
     this.sleeping = true;
     this.noChangesCount = 0;
-
-    // cache data when feature is clicked
-    this.infoCache = {};
 
     this.init = function () {
         this.playAreaSVG = new PlayAreaSVG();
@@ -1376,9 +1434,9 @@ $(document).ready(function initialSetup() {
 // card actions
     d3.select('#playCard').on('click', function playCard() {
         var card = mainApp.playAreaSVG.cardActionTarget;
-        if (cardActionTarget.playerId !== mainApp.playAreaSVG.tableData.player.id) {
-            mainApp.playAreaSVG.tableData.updateOwner(
-                cardActionTarget,
+        if (card.playerId !== mainApp.playAreaSVG.tableData.player.id) {
+            mainApp.playAreaSVG.updateOwner(
+                card,
                 mainApp.playAreaSVG.tableData.player.id);
         }
         mainApp.playAreaSVG.tableData.updateCardZone(card.id,
@@ -1402,8 +1460,13 @@ $(document).ready(function initialSetup() {
                                                      'inPlayFaceDown');
     });
     d3.select('#moveCardToHand').on('click', function moveCardToHand() {
-        var cardId = mainApp.playAreaSVG.cardActionTargetId;
-        mainApp.playAreaSVG.tableData.updateCardZone(cardId,
+        var card = mainApp.playAreaSVG.cardActionTarget;
+        if (card.playerId !== mainApp.playAreaSVG.tableData.player.id) {
+            mainApp.playAreaSVG.updateOwner(
+                card,
+                mainApp.playAreaSVG.tableData.player.id);
+        }
+        mainApp.playAreaSVG.tableData.updateCardZone(card.id,
                                                      'hand');
     });
     d3.select('#moveCardToTopOfDeck').on('click', function moveCardToTopOfDeck() {
@@ -1417,6 +1480,15 @@ $(document).ready(function initialSetup() {
         mainApp.playAreaSVG.tableData.updateCardZone(cardId,
                                                      'deck',
                                                      'bottom');
+    });
+    d3.select('#changeCardOwner').on('click', function changeCardOwner() {
+        var card = mainApp.playAreaSVG.cardActionTarget,
+            newOwnerId = $('#changeCardOwnerSelect').val();
+        if (card.playerId !== newOwnerId) {
+            mainApp.playAreaSVG.updateOwner(
+                card,
+                newOwnerId);
+        }
     });
 
 // deck actions

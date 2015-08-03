@@ -278,6 +278,21 @@ class Card
         $connection->close();
     }
 
+    public static function UpdateOwner($id, $playerId, $x, $y)
+    {
+        require_once "../../db_connect/cards.inc";
+
+        $connection = GetDatabaseConnection();
+        $updateCardGeometryQuery = $connection->prepare(
+            "UPDATE card
+             SET playerId = ?, xPos = ?, yPos = ?
+             WHERE id = ?");
+        $updateCardGeometryQuery->bind_param("iiii", $playerId, $x, $y, $id);
+        $updateCardGeometryQuery->execute();
+        $updateCardGeometryQuery->close();
+        $connection->close();
+    }
+
     public static function UnrotatePlayerCards($playerId)
     {
         require_once "../../db_connect/cards.inc";
