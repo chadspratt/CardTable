@@ -76,6 +76,51 @@ class Deck
         Card::AddCards($deckId, $cardNames, $cardImageUrls);
     }
 
+    public static function AddDefaultDeck($roomId, $deckName, $ownerId)
+    {
+        $deckId = Deck::GetDeckId($roomId, $playerId, $deckName);
+
+        $cardNames = [];
+        $cardImageUrls = [];
+
+        if (($deckManifest = fopen("decks/" . $deckName . "/manifest.csv", "r")) !== FALSE)
+        {
+            $headers = fgetcsv($deckManifest);
+            $nameIndex = 0;
+            $imageUrlIndex = 0;
+            $countIndex = 0;
+            while ($headers[$nameIndex] !== "name") {
+                $nameIndex += 1;
+                if ($nameIndex > count($headers)) {
+                    var_dump($headers);
+                }
+            }
+            while ($headers[$imageUrlIndex] !== "image_url") {
+                $imageUrlIndex += 1;
+                if ($imageUrlIndex > count($headers)) {
+                    var_dump($headers);
+                }
+            }
+            while ($headers[$countIndex] !== "count") {
+                $countIndex += 1;
+                if ($countIndex > count($headers)) {
+                    var_dump($headers);
+                }
+            }
+
+            while (($cardInfo = fgetcsv($deckManifest)) !== FALSE) {
+                for ($i=0; $i < $cardInfo[$countIndex]; $i++) {
+                    array_push($cardNames, $cardInfo[$nameIndex]);
+                    array_push($cardImageUrls, $cardInfo[$imageUrlIndex]);
+                }
+            }
+        }
+
+        require_once "card.php";
+        Card::RemoveAllCardsFromDeck($deckId);
+        Card::AddCards($deckId, $cardNames, $cardImageUrls);
+    }
+
     public static function Shuffle($deckId)
     {
         require_once "../../db_connect/cards.inc";

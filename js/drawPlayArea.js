@@ -144,7 +144,7 @@ function TableData() {
             ownerId = null;
         if (!isShared) {
             ownerId = this.player.id;
-        };
+        }
         for (var i = 0; i < cardsWithCounts.length; i++) {
             var card = cardsWithCounts[i];
             for (var j = 0; j < card.count; j++) {
@@ -162,6 +162,18 @@ function TableData() {
                     'cardImageUrls[]': cardImageUrls
                 });
     };
+    this.addDefaultDeck = function (deckName, isShared) {
+        var ownerId = null;
+        if (!isShared) {
+            ownerId = this.player.id;
+        }
+        $.post(tableStateURL,
+                {
+                    action: 'add_default_deck',
+                    deckName: deckName,
+                    ownerId: ownerId
+                });
+    }
     this.createMarker = function (text) {
         if (this.player.id !== null) {
             var textFound = false;
@@ -369,7 +381,6 @@ function PlayAreaSVG() {
         this.svg.on('click', function () {
             if (self.stationaryClickDetected) {
                 d3.select('#enlargedCard image').remove();
-                d3.select('#cardButtons').selectAll("*").remove();
                 self.stationaryClickDetected = false;
             }
         });
@@ -468,7 +479,6 @@ function PlayAreaSVG() {
         } else {
             d3.select('#enlargedCard image').remove();
         }
-        d3.select('#cardButtons').selectAll("*").remove();
         // put the card on top of other cards in its group
         var newOrdering = 0,
             siblings = parent.selectAll('image');
@@ -486,7 +496,6 @@ function PlayAreaSVG() {
     });
     this.drag.on('drag', function (d) {
         // d3.event.sourceEvent.stopPropagation();
-        // d3.select('#cardButtons').selectAll("*").remove();
         d.clicked = false;
         var drugObject = d3.select(this);
         if (self.dragOffset.x === null) {
@@ -1280,7 +1289,7 @@ $(document).ready(function initialSetup() {
     });
 
     $('#addDeckBox').hide();
-    $('#addDeckHeader').on('click', function showLoadDeckForm() {
+    $('#addDeckHeader').on('click', function showAddDeckForm() {
         $('#addDeckBox').toggle();
         if ($.trim($(this).text()) == 'Add Deck') {
             $(this).text('Hide Form');
@@ -1288,13 +1297,28 @@ $(document).ready(function initialSetup() {
             $(this).text('Add Deck');
         }
     });
+    $('#addCustomDeckBox').hide();
+    $('#addDeckSelect').on('change', function toggleCustomDeckForm() {
+        if ($(this).val() == 'custom') {
+            $('#addCustomDeckBox').show();
+        } else {
+            $('#addCustomDeckBox').hide();
+        }
+    });
     $('#addDeck').on('click', function passCSVToTableData() {
-        var deckName = $('#deckName').val(),
-            isShared = $('#newDeckIsShared').prop('checked'),
-            deckCSV = $('#deckCSV').val();
-        mainApp.playAreaSVG.tableData.addDeckFromCSV(deckName,
-                                                     isShared,
-                                                     deckCSV);
+        var isShared = $('#newDeckIsShared').prop('checked');
+
+        if ($('#addDeckSelect').val() == 'custom') {
+            var deckName = $('#deckName').val(),
+                  deckCSV = $('#deckCSV').val();
+            mainApp.playAreaSVG.tableData.addDeckFromCSV(deckName,
+                                                         isShared,
+                                                         deckCSV);
+        } else {
+            var deckName = $('#addDeckSelect').val();
+            mainApp.playAreaSVG.tableData.addDefaultDeck(deckName,
+                                                         isShared);
+        }
         $('#addDeckBox').hide();
     });
 

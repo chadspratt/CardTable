@@ -5,41 +5,6 @@ if (!isset($_SESSION["lastUpdateId"]))
     $_SESSION["lastUpdateId"] = -1;
 }
 session_write_close();
-// require_once "../../db_connect/cards.inc";
-// require_once "php/room.php";
-
-// $connection = GetDatabaseConnection();
-// $updateQuery = $connection->prepare(
-//     "UPDATE CurrentState SET
-//     zone = ?, xPos = ?, yPos = ?, rotation = ?, ordering = ?
-//     WHERE room = ? AND player = ? AND type = ? AND id = ?");
-// $updateDeckOrderQuery = $connection->prepare(
-//     "UPDATE CurrentState SET
-//     ordering = ?
-//     WHERE room = ? AND player = ? AND id = ? AND zone = 'deck'");
-// $resetDeckQuery = $connection->prepare(
-//     "UPDATE CurrentState SET
-//     zone = \"deck\", xPos = ?, yPos = ?, rotation = 0, ordering = 0
-//     WHERE room = ? AND player = ? AND type = \"card\"");
-// $unrotatePlayerCardsQuery = $connection->prepare(
-//     "UPDATE CurrentState SET
-//     rotation = 0
-//     WHERE room = ? AND player = ? AND type = \"card\"");
-// $resetMarkersQuery = $connection->prepare(
-//     "DELETE FROM CurrentState
-//     WHERE room = ? AND player = ? AND type = \"marker\"");
-// $removeQuery = $connection->prepare(
-//     "DELETE FROM CurrentState
-//     WHERE room = ? AND player = ? AND type = ? AND id = ?");
-// $removePlayerQuery = $connection->prepare(
-//     "DELETE FROM CurrentState
-//     WHERE room = ? AND player = ?");
-// $removePlayerObjectsQuery = $connection->prepare(
-//     "DELETE FROM CurrentState
-//     WHERE room = ? AND player = ? AND type != \"player\"");
-// $removeRoomQuery = $connection->prepare(
-//     "DELETE FROM CurrentState
-//     WHERE room = ?");
 
 // for debugging
 if ($_SERVER['REQUEST_METHOD'] === 'GET')
@@ -48,17 +13,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET')
 }
 // var_dump($_POST);
 
-if (isset($_POST["jsonArguments"]))
-{
-    $actionArray = json_decode($_POST["jsonArguments"]);
-    for ($i=0; $i < count($actionArray); $i++) {
-        ProcessRequest($actionArray[$i]);
-    }
-}
-else
-{
+// if (isset($_POST["jsonArguments"]))
+// {
+//     $actionArray = json_decode($_POST["jsonArguments"]);
+//     for ($i=0; $i < count($actionArray); $i++) {
+//         ProcessRequest($actionArray[$i]);
+//     }
+// }
+// else
+// {
     ProcessRequest($_POST);
-}
+// }
+
 function ProcessRequest($args)
 {
     require_once "../../db_connect/cards.inc";
@@ -176,12 +142,17 @@ function ProcessRequest($args)
         }
         elseif ($args["action"] === "add_deck")
         {
-
             Deck::AddDeck($roomId,
                           $args["deckName"],
                           $args["ownerId"],
                           $args["cardNames"],
                           $args["cardImageUrls"]);
+        }
+        elseif ($args["action"] === "add_default_deck")
+        {
+            Deck::AddDefaultDeck($roomId,
+                          $args["deckName"],
+                          $args["ownerId"]);
         }
         elseif ($args["action"] === "update_table_image_url")
         {

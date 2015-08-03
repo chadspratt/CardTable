@@ -25,7 +25,6 @@
   <g id="players"></g>
   <g id="markers"></g>
   <g id="enlargedCard"></g>
-  <g id="cardButtons"></g>
 </svg>
 
 <div id="coordDisplay" class="overlayItem">x: y:</div>
@@ -105,12 +104,26 @@
       <span id="addDeckHeader" class="links">Add Deck</span>
 
       <div id="addDeckBox">
-        <div>Deck name:<input id="deckName" type="text" value="" size="12"></div>
+        <select id="addDeckSelect">
+          <?php $defaultDecks = scandir("decks");
+           $defaultDecks = array_diff($defaultDecks, array('..', '.'));
+           var_dump($defaultDecks);
+           foreach ($defaultDecks as $key => $deckName)
+           { ?>
+              <option value="<?php echo $deckName; ?>">
+                <?php echo $deckName; ?>
+              </option>
+            <?php } ?>
+          <option value="custom">Custom</option>
+        </select>
         <div>Shared <input id="newDeckIsShared" type="checkbox"></div>
-        <div>Paste csv with these columns:</div>
-        <div>name,image_url,count</div>
-        <div>(case-sensitive, no spaces between fields, any order)</div>
-        <textarea type="text" id="deckCSV" value="" rows="10" cols="33"></textarea>
+        <div id="addCustomDeckBox">
+          <div>Deck name:<input id="deckName" type="text" value="" size="12"></div>
+          <div>Paste csv with these columns:</div>
+          <div>name,image_url,count</div>
+          <div>(case-sensitive, no spaces between fields, any order)</div>
+          <textarea type="text" id="deckCSV" value="" rows="10" cols="33"></textarea>
+        </div>
         <div><button id="addDeck">Add Deck</button></div>
       </div>
 
