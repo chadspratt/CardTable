@@ -149,7 +149,7 @@ function TableData() {
             var card = cardsWithCounts[i];
             for (var j = 0; j < card.count; j++) {
                 cardNames.push(card.name);
-                cardImageUrls.push(card.imageUrl);
+                cardImageUrls.push(card.image_url);
             }
         }
 
